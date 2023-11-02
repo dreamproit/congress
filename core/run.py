@@ -1,14 +1,14 @@
 #!/usr/bin/env python
 
-import sys
-import os
-import traceback
-import pprint as pp
-import logging
 import importlib
-from congress.common.constants.congress import CongressConstants
+import logging
+import os
+
 # set global HTTP timeouts to 10 seconds
 import socket
+import sys
+
+from congress.common.constants.congress import CongressConstants
 
 logger = logging.getLogger(CongressConstants.CONGRESS_DEFAULT_LOGGER_NAME.value)
 
@@ -38,7 +38,6 @@ def main():
                 value = False
             options[key.lower()] = value
 
-
     # configure logging
     if options.get('debug', False):
         log_level = "debug"
@@ -54,7 +53,6 @@ def main():
     else:
         logging.basicConfig(format='%(message)s', level=log_level.upper())
 
-
     sys.path.append(os.path.join(CONGRESS_ROOT, "tasks"))
     import core.tasks.utils as utils
 
@@ -65,10 +63,18 @@ def main():
             patch_mod = importlib.import_module(options['patch'])
             patch_func = getattr(patch_mod, 'patch', None)
             if patch_func is None:
-                logger.error("You specified a --patch argument but the {} module does not contain a 'patch' function.".format(options['patch']))
+                logger.error(
+                    "You specified a --patch argument but the {} module does not contain a 'patch' function.".format(
+                        options['patch']
+                    )
+                )
                 sys.exit(1)
             elif not callable(patch_func):
-                logger.error("You specified a --patch argument but {}.patch is not callable".format(options['patch']))
+                logger.error(
+                    "You specified a --patch argument but {}.patch is not callable".format(
+                        options['patch']
+                    )
+                )
                 sys.exit(1)
             else:
                 patch_mod.patch(task_name)
@@ -76,6 +82,7 @@ def main():
         task_mod.run(options)
     except Exception as exception:
         utils.admin(exception)
+
 
 if __name__ == "__main__":
 

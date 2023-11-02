@@ -1,19 +1,26 @@
-import requests
-from utils import getBillParts
-from lxml import etree
-import re
 from collections import defaultdict
 import json
 import pathlib
-import click
-from govinfo import mirror_package, mirror_bulkdata_file
+import re
+
 from bills import process_bill
+from govinfo import mirror_bulkdata_file, mirror_package
+from lxml import etree
+import click
+import requests
+
+from utils import getBillParts
+
 # globals
 GOVINFO_BASE_URL = "https://www.govinfo.gov/"
 COLLECTION_BASE_URL = GOVINFO_BASE_URL + "app/details/"
 BULKDATA_BASE_URL = GOVINFO_BASE_URL + "bulkdata/"
-COLLECTION_SITEMAPINDEX_PATTERN = GOVINFO_BASE_URL + "sitemap/{collection}_sitemap_index.xml"
-BULKDATA_SITEMAPINDEX_PATTERN = GOVINFO_BASE_URL + "sitemap/bulkdata/{collection}/sitemapindex.xml"
+COLLECTION_SITEMAPINDEX_PATTERN = (
+    GOVINFO_BASE_URL + "sitemap/{collection}_sitemap_index.xml"
+)
+BULKDATA_SITEMAPINDEX_PATTERN = (
+    GOVINFO_BASE_URL + "sitemap/bulkdata/{collection}/sitemapindex.xml"
+)
 FDSYS_BILLSTATUS_FILENAME = "fdsys_billstatus.xml"
 
 ns = {"x": "http://www.sitemaps.org/schemas/sitemap/0.9"}
@@ -57,7 +64,12 @@ def get_bill_status_urls_per_type(sitemap_item: dict):
     except etree.XMLSyntaxError as e:
         raise Exception("XML syntax error in %s: %s" % (response.url, str(e)))
 
-    sitemap_items = {'congress': None, 'billstatuses': [], 'billtype': None, 'total': None}
+    sitemap_items = {
+        'congress': None,
+        'billstatuses': [],
+        'billtype': None,
+        'total': None,
+    }
 
     if sitemap.tag == "{http://www.sitemaps.org/schemas/sitemap/0.9}urlset":
 
@@ -72,7 +84,9 @@ def get_bill_status_urls_per_type(sitemap_item: dict):
                 raise Exception("Unmatched bulk data file URL (%s) at %s.")
             collection = m.group(1)
             item_path = m.group(2)
-            local_file_path_template = '{congress}/bills/{billtype}/{billtype}{billnum}/fdsys_billstatus.xml'
+            local_file_path_template = (
+                '{congress}/bills/{billtype}/{billtype}{billnum}/fdsys_billstatus.xml'
+            )
             bill_parts = getBillParts(item_path.split('/')[-1].split('-')[-1])
             sitemap_item = {
                 'url': url,
@@ -82,7 +96,7 @@ def get_bill_status_urls_per_type(sitemap_item: dict):
                 'collection': collection,
                 'lastmod': lastmod,
                 'item_path': item_path,
-                'local_filepath': local_file_path_template.format(**bill_parts)
+                'local_filepath': local_file_path_template.format(**bill_parts),
             }
             sitemap_items['congress'] = bill_parts['congress']
             sitemap_items['billstatuses'].append(sitemap_item)
@@ -115,7 +129,7 @@ def get_bills_per_type(sitemap_item: dict):
                 raise Exception("Unmatched bulk data file URL (%s) at %s.")
             collection = m.group(1)
             item_path = m.group(2)
-            local_file_path_template = '{congress}/bills/{billtype}/{billtype}{billnum}/text-versions/{billversion}/document.xml'
+            local_file_path_template = '{congress}/bills/{billtype}/{billtype}{billnum}/text-versions/{billversion}/document.xml'  # noqa
             bill_parts = getBillParts(item_path.split('/')[-1].split('-')[-1])
             sitemap_item = {
                 'url': url,
@@ -126,7 +140,7 @@ def get_bills_per_type(sitemap_item: dict):
                 'collection': collection,
                 'lastmod': lastmod,
                 'item_path': item_path,
-                'local_filepath': local_file_path_template.format(**bill_parts)
+                'local_filepath': local_file_path_template.format(**bill_parts),
             }
             sitemap_items['congress'] = bill_parts['congress']
             sitemap_items['bills'].append(sitemap_item)
@@ -167,6 +181,7 @@ def get_bills_info():
 
 def save_info_file(filename: str, data: dict):
     import json
+
     with open(filename, 'w') as outfile:
         json.dump(data, outfile)
 
@@ -199,9 +214,13 @@ def check_file_system_for_missing_bill_statuses(bill_statuses_info: dict):
                 missing_bill_statuses[congress_num]['total'] = bill_type_stats
                 continue
             for bill_status in bill_type_stats['billstatuses']:
-                local_filepath = pathlib.Path(f'{local_prefix}/{bill_status["local_filepath"]}')
+                local_filepath = pathlib.Path(
+                    f'{local_prefix}/{bill_status["local_filepath"]}'
+                )
                 if not local_filepath.exists():
-                    missing_bill_statuses[bill_status['congress']][bill_status['billtype']]['billstatuses'].append(bill_status)
+                    missing_bill_statuses[bill_status['congress']][
+                        bill_status['billtype']
+                    ]['billstatuses'].append(bill_status)
     for congress_num, per_bill_type_stats in missing_bill_statuses.items():
         total_per_congress = 0
         for bill_type, bill_type_stats in per_bill_type_stats.items():
@@ -212,7 +231,9 @@ def check_file_system_for_missing_bill_statuses(bill_statuses_info: dict):
     return missing_bill_statuses
 
 
-def check_file_system_for_missing_bill_statuses_data_json_files(bill_statuses_info: dict):
+def check_file_system_for_missing_bill_statuses_data_json_files(
+    bill_statuses_info: dict,
+):
     local_prefix = '/bills_data/data'
     missing_bill_statuses = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
     for congress_num, per_bill_type_stats in bill_statuses_info.items():
@@ -221,10 +242,14 @@ def check_file_system_for_missing_bill_statuses_data_json_files(bill_statuses_in
                 missing_bill_statuses[congress_num]['total'] = bill_type_stats
                 continue
             for bill_status in bill_type_stats['billstatuses']:
-                data_json_filepath = bill_status["local_filepath"].replace('fdsys_billstatus.xml', 'data.json')
+                data_json_filepath = bill_status["local_filepath"].replace(
+                    'fdsys_billstatus.xml', 'data.json'
+                )
                 local_filepath = pathlib.Path(f'{local_prefix}/{data_json_filepath}')
                 if not local_filepath.exists():
-                    missing_bill_statuses[bill_status['congress']][bill_status['billtype']]['billstatuses'].append(bill_status)
+                    missing_bill_statuses[bill_status['congress']][
+                        bill_status['billtype']
+                    ]['billstatuses'].append(bill_status)
     for congress_num, per_bill_type_stats in missing_bill_statuses.items():
         total_per_congress = 0
         for bill_type, bill_type_stats in per_bill_type_stats.items():
@@ -244,9 +269,13 @@ def check_file_system_for_missing_bills(bills_info: dict):
                 missing_bills[congress_num]['total'] = bill_type_stats
                 continue
             for bill in bill_type_stats['bills']:
-                local_filepath = pathlib.Path(f'{local_prefix}/{bill["local_filepath"]}')
+                local_filepath = pathlib.Path(
+                    f'{local_prefix}/{bill["local_filepath"]}'
+                )
                 if not local_filepath.exists():
-                    missing_bills[bill['congress']][bill['billtype']]['bills'].append(bill)
+                    missing_bills[bill['congress']][bill['billtype']]['bills'].append(
+                        bill
+                    )
     for congress_num, per_bill_type_stats in missing_bills.items():
         total_per_congress = 0
         for bill_type, bill_type_stats in per_bill_type_stats.items():
@@ -304,8 +333,6 @@ def download_bill_statuses(data: dict):
                     lastmod=lastmod,
                     options=options,
                 )
-                # collection, url, item_path, lastmod, options
-                # ['BILLSTATUS', 'https://www.govinfo.gov/bulkdata/BILLSTATUS/113/s/BILLSTATUS-113s1422.xml', '113/s/BILLSTATUS-113s1422.xml', '2023-04-11T04:36:01.310Z', {'bulkdata': 'BILLSTATUS'}]
                 if not downloaded_package_info:
                     logger.error(f'Failed to download bill status: "{bill_id}".')
                     continue
@@ -328,7 +355,9 @@ def create_bill_statuses_json_files(data: json):
                     options=options,
                 )
                 if not status:
-                    logger.error(f'Failed to create bill status data.json file: "{bill_id}".')
+                    logger.error(
+                        f'Failed to create bill status data.json file: "{bill_id}".'
+                    )
                     continue
                 if status['saved']:
                     created_bill_statuses_data_json_files.append(bill_status['url'])
@@ -419,25 +448,56 @@ def main(
         bill_statuses_info = read_info_file('bill_statuses_info.json')
         if not bill_statuses_info:
             logger.warning(
-                'No bill statuses info .json file found, try running the script without "--skip-save-bill-statuses-info" flag to save .json file.'
+                'No bill statuses info .json file found, try running the script without '
+                '"--skip-save-bill-statuses-info" flag to save .json file.'
             )
             return
-        total_bill_statuses_across_congresses = sum({k: v['total'] for k, v in bill_statuses_info.items()}.values())
-        logger.info(f'bill_statuses_info.json have total: "{total_bill_statuses_across_congresses}" bill statuses.')
-        missing_bill_statuses = check_file_system_for_missing_bill_statuses(bill_statuses_info)
+        total_bill_statuses_across_congresses = sum(
+            {k: v['total'] for k, v in bill_statuses_info.items()}.values()
+        )
+        logger.info(
+            f'bill_statuses_info.json have total: "{total_bill_statuses_across_congresses}" bill statuses.'
+        )
+        missing_bill_statuses = check_file_system_for_missing_bill_statuses(
+            bill_statuses_info
+        )
 
-        total_missing_bill_statuses_across_congresses = sum({k: v['total_missing'] for k, v in missing_bill_statuses.items()}.values())
-        logger.info(f'local file system missing total: "{total_missing_bill_statuses_across_congresses}" bill statuses.')
+        total_missing_bill_statuses_across_congresses = sum(
+            {k: v['total_missing'] for k, v in missing_bill_statuses.items()}.values()
+        )
+        logger.info(
+            f'local file system missing total: "{total_missing_bill_statuses_across_congresses}" bill statuses.'
+        )
 
         for congress_num, per_bill_type_stats in missing_bill_statuses.items():
-            logger.info(f'Congress: "{congress_num}" has total: "{per_bill_type_stats["total"]}" bill statuses and missing: "{per_bill_type_stats["total_missing"]}" bill statuses.')
+            logger.info(
+                f'Congress: "{congress_num}" has total: "{per_bill_type_stats["total"]}" bill statuses and missing: '
+                f'"{per_bill_type_stats["total_missing"]}" bill statuses.'
+            )
 
-        missing_bill_statuses_data_json_files = check_file_system_for_missing_bill_statuses_data_json_files(bill_statuses_info)
-        total_missing_bill_statuses_across_congresses = sum({k: v['total_missing'] for k, v in missing_bill_statuses_data_json_files.items()}.values())
-        logger.info(f'local file system missing total: "{total_missing_bill_statuses_across_congresses}" data.json files.')
+        missing_bill_statuses_data_json_files = (
+            check_file_system_for_missing_bill_statuses_data_json_files(
+                bill_statuses_info
+            )
+        )
+        total_missing_bill_statuses_across_congresses = sum(
+            {
+                k: v['total_missing']
+                for k, v in missing_bill_statuses_data_json_files.items()
+            }.values()
+        )
+        logger.info(
+            f'local file system missing total: "{total_missing_bill_statuses_across_congresses}" data.json files.'
+        )
 
-        for congress_num, per_bill_type_stats in missing_bill_statuses_data_json_files.items():
-            logger.info(f'Congress: "{congress_num}" has total: "{per_bill_type_stats["total"]}" bill statuses and missing: "{per_bill_type_stats["total_missing"]}" bill statuses data.json files.')
+        for (
+            congress_num,
+            per_bill_type_stats,
+        ) in missing_bill_statuses_data_json_files.items():
+            logger.info(
+                f'Congress: "{congress_num}" has total: "{per_bill_type_stats["total"]}" bill statuses and missing: '
+                f'"{per_bill_type_stats["total_missing"]}" bill statuses data.json files.'
+            )
 
     if skip_show_bills_info:
         logger.info('Skipping showing bills info from .json file.')
@@ -445,14 +505,22 @@ def main(
         bills_info = read_info_file('bills_info.json')
         if not bills_info:
             logger.warning(
-                'No bills info .json file found, try running the script without "--skip-save-bills-info" flag to save .json file.'
+                'No bills info .json file found, try running the script without "--skip-save-bills-info" '
+                'flag to save .json file.'
             )
             return
-        total_bills_across_congresses = sum({k: v['total'] for k, v in bills_info.items()}.values())
-        logger.info(f'bills_info.json have total: "{total_bills_across_congresses}" bills.')
+        total_bills_across_congresses = sum(
+            {k: v['total'] for k, v in bills_info.items()}.values()
+        )
+        logger.info(
+            f'bills_info.json have total: "{total_bills_across_congresses}" bills.'
+        )
         missing_bills = check_file_system_for_missing_bills(bills_info)
         for congress_num, per_bill_type_stats in missing_bills.items():
-            logger.info(f'Congress: "{congress_num}" has total: "{per_bill_type_stats["total"]}" bills and missing: "{per_bill_type_stats["total_missing"]}" bills.')
+            logger.info(
+                f'Congress: "{congress_num}" has total: "{per_bill_type_stats["total"]}" bills and missing: '
+                f'"{per_bill_type_stats["total_missing"]}" bills.'
+            )
 
     if skip_download_missing_bill_statuses:
         logger.info('Skipping downloading missing bill statuses from .json file.')
@@ -460,18 +528,25 @@ def main(
         bill_statuses_info = read_info_file('bill_statuses_info.json')
         if not bill_statuses_info:
             logger.warning(
-                'No bill statuses info .json file found, try running the script without "--skip-save-bill-statuses-info" flag to save .json file.'
+                'No bill statuses info .json file found, try running the script without '
+                '"--skip-save-bill-statuses-info" flag to save .json file.'
             )
             return
-        missing_bill_statuses = check_file_system_for_missing_bill_statuses(bill_statuses_info)
+        missing_bill_statuses = check_file_system_for_missing_bill_statuses(
+            bill_statuses_info
+        )
         downloaded_bill_statuses = download_bill_statuses(missing_bill_statuses)
         for bill_status in downloaded_bill_statuses:
             logger.info(f'Downloaded bill status: "{bill_status}".')
 
-        missing_bill_statuses_data_json_files = check_file_system_for_missing_bill_statuses_data_json_files(
-            bill_statuses_info
+        missing_bill_statuses_data_json_files = (
+            check_file_system_for_missing_bill_statuses_data_json_files(
+                bill_statuses_info
+            )
         )
-        created_bill_statuses_data_json_files = create_bill_statuses_json_files(missing_bill_statuses_data_json_files)
+        created_bill_statuses_data_json_files = create_bill_statuses_json_files(
+            missing_bill_statuses_data_json_files
+        )
         for bill_status in created_bill_statuses_data_json_files:
             logger.info(f'Created bill status data.json files: "{bill_status}".')
 
@@ -481,7 +556,8 @@ def main(
         bills_info = read_info_file('bills_info.json')
         if not bills_info:
             logger.warning(
-                'No bills info .json file found, try running the script without "--skip-save-bills-info" flag to save .json file.'
+                'No bills info .json file found, try running the script without "--skip-save-bills-info" '
+                'flag to save .json file.'
             )
             return
         missing_bills = check_file_system_for_missing_bills(bills_info)

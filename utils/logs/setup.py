@@ -1,13 +1,12 @@
+from logging.handlers import TimedRotatingFileHandler
+from pathlib import Path
 import gzip
 import logging
 import os
 import re
 import sys
-from logging.handlers import TimedRotatingFileHandler
-from pathlib import Path
 
 from congress.common.constants.congress import CongressConstants
-from common.constants.billml import BillMLConstants
 
 
 class CompressingTimedRotatingFileHandler(TimedRotatingFileHandler):
@@ -61,7 +60,9 @@ class CompressingTimedRotatingFileHandler(TimedRotatingFileHandler):
         )
         if not all_files:
             return
-        full_name_regex = CongressConstants.LOG_FULL_FILE_NAME_REGEX.value.format(base_name=archive_base_name)
+        full_name_regex = CongressConstants.LOG_FULL_FILE_NAME_REGEX.value.format(
+            base_name=archive_base_name
+        )
         target_files = sorted(
             [
                 file_path
@@ -97,7 +98,7 @@ class CompressingTimedRotatingFileHandler(TimedRotatingFileHandler):
     @staticmethod
     def remove_extra_files_by_amount(files: list[Path]) -> None:
         """Delete all files that exceeds maximum allowed amount."""
-        for file in files[CongressConstants.LOG_ARCHIVES_MAX_AMOUNT.value:]:
+        for file in files[CongressConstants.LOG_ARCHIVES_MAX_AMOUNT.value :]:
             try:
                 file.unlink()
             except FileNotFoundError:

@@ -1,7 +1,6 @@
-import os
-
 import enum
 import multiprocessing
+import os
 
 
 class CongressConstants(enum.Enum):
