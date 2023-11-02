@@ -408,10 +408,6 @@ def actions_for(action_list, bill_id, title):
 
         keep = True
         if closure['prev']:
-            # try:
-            #     code = item['sourceSystem']['code']
-            # except KeyError:
-            #     code = closure['prev']['sourceSystem'].get('code')
             code = item.get('sourceSystem', {}).get('code')
             if not code:
                 code = closure.get('prev', {}).get('sourceSystem', {}).get('code')
@@ -883,7 +879,6 @@ def parse_bill_action(action_dict, prev_status, bill_id, title):
             if bill_item[0] == (bill_type + number):
                 as_amended = len(bill_item) > 1
         if as_amended is None: 
-            # raise ValueError("Did not find bill in list: " + line)
             logger.error("Did not find bill in list: " + line)
 
         vote_type = "vote" if (bill_type[0] == "h") else "vote2"
