@@ -1,28 +1,27 @@
+from email.mime.text import MIMEText
+import datetime
+import email.utils
+import errno
+import html.entities
+import json
+import logging
 import os
 import os.path
-import errno
+import re
+import signal
+import smtplib
 import sys
 import traceback
 import zipfile
-import platform
-import re
-import html.entities
-import json
-from pytz import timezone
-import datetime
-import time
+
 from lxml import etree
+from pytz import timezone
+import requests
 import scrapelib
-import pprint
-import logging
-import subprocess
-import signal
 
-import smtplib
-import email.utils
-from email.mime.text import MIMEText
-import getpass
+from congress.common.constants.congress import CongressConstants
 
+logger = logging.getLogger(CongressConstants.CONGRESS_DEFAULT_LOGGER_NAME.value)
 
 # read in an opt-in config file for changing directories and supplying email settings
 # returns None if it's not there, and this should always be handled gracefully
@@ -30,6 +29,7 @@ path = "config.yml"
 if os.path.exists(path):
     # Don't use a cached config file, just in case, and direct_yaml_load is not yet defined.
     import yaml
+
     config = yaml.load(open(path), Loader=yaml.BaseLoader)
 else:
     config = None
@@ -38,8 +38,24 @@ else:
 eastern_time_zone = timezone('US/Eastern')
 
 # scraper should be instantiated at class-load time, so that it can rate limit appropriately
-scraper = scrapelib.Scraper(requests_per_minute=120, retry_attempts=3)
-scraper.user_agent = "unitedstates/congress (https://github.com/unitedstates/congress)"
+# scraper = scrapelib.Scraper(requests_per_minute=120, retry_attempts=3)
+# scraper.user_agent = "unitedstates/congress (https://github.com/unitedstates/congress)"
+
+
+def getBillParts(filename):
+    """Gets dict with 'congress, billtype, billnum, billversion' from provided filename by matching with regex template."""  # noqa
+    m1 = re.match(
+        (
+            r'(?:BILLS-)?(?P<congress>\d{3})(?P<billtype>[a-z]+)(?P<billnum>\d+)'
+            r'(?P<billversion>[a-z]+)?(?:\.(?P<filetype>[a-z]{3}))?'
+        ),
+        filename,
+    )
+    if m1 is not None:
+        billPartsDict = m1.groupdict()
+    else:
+        return None
+    return billPartsDict
 
 
 def format_datetime(obj):
@@ -66,8 +82,6 @@ def current_legislative_year(date=None):
     if not date:
         date = datetime.datetime.now()
 
-    year = date.year
-
     if date.month == 1:
         if date.day == 1 or date.day == 2:
             return date.year - 1
@@ -80,7 +94,8 @@ def current_legislative_year(date=None):
 
 
 def get_congress_first_year(congress):
-    return (((int(congress) + 894) * 2) - 1)
+    return ((int(congress) + 894) * 2) - 1
+
 
 # get the three calendar years that the Congress extends through (Jan 3 to Jan 3).
 
@@ -88,6 +103,7 @@ def get_congress_first_year(congress):
 def get_congress_years(congress):
     y1 = get_congress_first_year(congress)
     return (y1, y1 + 1, y1 + 2)
+
 
 # Get a list of Congresses associated with a particular term.
 # XXX: This can be highly unreliable and may be deeply flawed.
@@ -114,18 +130,19 @@ def get_term_congresses(term):
 
     end_congress_last_year = end_congress_years[2]
 
-    valid_congresses = (start_year >= start_congress_first_year) and (end_year <= end_congress_last_year)
-
-#  if not valid_congresses:
-#    print(term["type"], start_congress, (start_year, start_congress_first_year), (end_year, end_congress_last_year))
+    valid_congresses = (start_year >= start_congress_first_year) and (
+        end_year <= end_congress_last_year
+    )
 
     return congresses if valid_congresses else []
+
 
 # bill_type, bill_number, congress
 
 
 def split_bill_id(bill_id):
-    return re.match("^([a-z]+)(\d+)-(\d+)$", bill_id).groups()
+    return re.match(r"^([a-z]+)(\d+)-(\d+)$", bill_id).groups()
+
 
 # "hjres1234-115"
 
@@ -133,11 +150,13 @@ def split_bill_id(bill_id):
 def build_bill_id(bill_type, bill_number, congress):
     return "%s%s-%s" % (bill_type, bill_number, congress)
 
+
 # bill_type, bill_number, congress, version_code
 
 
 def split_bill_version_id(bill_version_id):
-    return re.match("^([a-z]+)(\d+)-(\d+)-([a-z\d]+)$", bill_version_id).groups()
+    return re.match(r"^([a-z]+)(\d+)-(\d+)-([a-z\d]+)$", bill_version_id).groups()
+
 
 # "hjres1234-115-enr"
 
@@ -149,7 +168,8 @@ def build_bill_version_id(bill_type, bill_number, congress, version_code):
 def split_vote_id(vote_id):
     # Sessions are either four-digit years for modern day votes or a digit or letter
     # for historical votes before sessions were basically calendar years.
-    return re.match("^(h|s)(\d+)-(\d+).(\d\d\d\d|[0-9A-Z])$", vote_id).groups()
+    return re.match(r"^(h|s)(\d+)-(\d+).(\d\d\d\d|[0-9A-Z])$", vote_id).groups()
+
 
 # nomination_type (always PN), nomination_number, congress
 #   nomination_number is usually a number, but can be hyphenated, e.g. PN64-01-111
@@ -158,9 +178,10 @@ def split_vote_id(vote_id):
 
 def split_nomination_id(nomination_id):
     try:
-        return re.match("^([A-z]{2})([\d-]+)-(\d+)$", nomination_id).groups()
-    except Exception as e:
-        logging.error("Unabled to parse %s" % nomination_id)
+        return re.match(r"^([A-z]{2})([\d-]+)-(\d+)$", nomination_id).groups()
+    except Exception as exc:
+        logger.error("Unabled to parse %s" % nomination_id)
+        logger.exception(exc)
         return (None, None, None)
 
 
@@ -182,13 +203,13 @@ def process_set(to_fetch, fetch_func, options, *extra_args):
         if results.get('ok', False):
             if results.get('saved', False):
                 saved.append(id)
-                logging.info("[%s] Updated" % id)
+                logger.info("[%s] Updated" % id)
             else:
                 skips.append(id)
-                logging.warn("[%s] Skipping: %s" % (id, results['reason']))
+                logger.warn("[%s] Skipping: %s" % (id, results['reason']))
         else:
             errors.append((id, results, None))
-            logging.error("[%s] Error: %s" % (id, results['reason']))
+            logger.error("[%s] Error: %s" % (id, results['reason']))
 
     if len(errors) > 0:
         message = "\nErrors for %s items:\n" % len(errors)
@@ -202,9 +223,9 @@ def process_set(to_fetch, fetch_func, options, *extra_args):
 
         admin(message)  # email if possible
 
-    logging.warning("\nErrors for %s." % len(errors))
-    logging.warning("Skipped %s." % len(skips))
-    logging.warning("Saved data for %s." % len(saved))
+    logger.warning("\nErrors for %s." % len(errors))
+    logger.warning("Skipped %s." % len(skips))
+    logger.warning("Saved data for %s." % len(saved))
 
     return saved + skips  # all of the OK's
 
@@ -215,6 +236,10 @@ _download_zip_files = {}
 
 
 def download(url, destination=None, options={}):
+    scraper = scrapelib.Scraper(requests_per_minute=120, retry_attempts=3)
+    scraper.user_agent = (
+        "unitedstates/congress (https://github.com/unitedstates/congress)"
+    )
     # uses cache by default, override (True) to ignore
     force = options.get('force', False)
 
@@ -230,8 +255,12 @@ def download(url, destination=None, options={}):
     # if need a POST request with data
     postdata = options.get('postdata', False)
 
-    timeout = float(options.get('timeout', 30))  # The low level socket api requires a float
-    allowRedirects = float(options.get('allow_redirects', True)) # Follow redirects i.g. http -> https
+    timeout = float(
+        options.get('timeout', 30)
+    )  # The low level socket api requires a float
+    allowRedirects = float(
+        options.get('allow_redirects', True)
+    )  # Follow redirects i.g. http -> https
     urlopen_kwargs = {'timeout': timeout, 'allow_redirects': allowRedirects}
 
     # caller cares about actually bytes or only success/fail
@@ -260,7 +289,7 @@ def download(url, destination=None, options={}):
         dparts = destination.split(os.sep)
         for i in range(len(dparts) - 1):
             # form the ZIP file name and test if it exists...
-            zfn = os.path.join(cache, *dparts[:i + 1]) + ".zip"
+            zfn = os.path.join(cache, *dparts[: i + 1]) + ".zip"
             if not os.path.exists(zfn):
                 continue
 
@@ -269,7 +298,7 @@ def download(url, destination=None, options={}):
             if not zf:
                 zf = zipfile.ZipFile(zfn, "r")
                 _download_zip_files[zfn] = zf
-                logging.warn("Loaded: %s" % zfn)
+                logger.warn("Loaded: %s" % zfn)
 
             # see if the inner file exists, and if so read the bytes
             try:
@@ -280,9 +309,11 @@ def download(url, destination=None, options={}):
                 continue
 
             if not test:
-                logging.info("Cached: (%s, %s)" % (zfn + "#" + zfn_inner, url))
+                logger.info("Cached: (%s, %s)" % (zfn + "#" + zfn_inner, url))
             if force:
-                raise Exception("Cannot re-download a file already cached to a ZIP file.")
+                raise Exception(
+                    "Cannot re-download a file already cached to a ZIP file."
+                )
 
             if not is_binary:
                 body = body.decode("utf8")
@@ -293,7 +324,7 @@ def download(url, destination=None, options={}):
     # Load the file from disk if it's already been downloaded and force is False.
     if destination and (not force) and os.path.exists(cache_path):
         if not test:
-            logging.info("Cached: (%s, %s)" % (cache_path, url))
+            logger.info("Cached: (%s, %s)" % (cache_path, url))
         if not needs_content:
             return True
         with open(cache_path, 'rb') as f:
@@ -304,8 +335,10 @@ def download(url, destination=None, options={}):
     # Download from the network and cache to disk.
     else:
         try:
-            logging.info("Downloading: %s" % url)
-
+            logger.info("Downloading: %s" % url)
+            # import urllib3
+            # urllib3.disable_warnings()
+            # sleep(5)
             if postdata:
                 response = scraper.post(url, postdata, **urlopen_kwargs)
             else:
@@ -313,7 +346,9 @@ def download(url, destination=None, options={}):
                     mkdir_p(os.path.dirname(cache_path))
                     scraper.urlretrieve(url, cache_path, **urlopen_kwargs)
                     return True
-
+                logger.info(
+                    f'Making a GET request to the url: "{url}", params: {urlopen_kwargs}.'
+                )
                 response = scraper.get(url, **urlopen_kwargs)
 
             if not is_binary:
@@ -321,13 +356,16 @@ def download(url, destination=None, options={}):
                 if not isinstance(body, str):
                     raise ValueError("Content not decoded.")
             else:
-                body = response.content # a 'str' instance
+                body = response.content  # a 'str' instance
                 if isinstance(body, str):
                     raise ValueError("Binary content improperly decoded.")
         except scrapelib.HTTPError as e:
-            logging.error("Error downloading %s:\n\n%s" % (url, format_exception(e)))
+            logger.error("Error downloading %s:\n\n%s" % (url, format_exception(e)))
             if options.get("return_status_code_on_error"):
                 return e.response.status_code
+            return None
+        except requests.exceptions.SSLError as e:
+            logger.error("Error downloading %s:\n\n%s" % (url, format_exception(e)))
             return None
 
         # don't allow 0-byte files
@@ -370,35 +408,39 @@ def write(content, destination, options={}):
                 return
 
     # Save the content to disk.
+    logger.info(f'Saving file with filepath : "{destination}".')
     mkdir_p(os.path.dirname(destination))
     f = open(destination, 'wb')
     try:
         f.write(content.encode('utf-8'))
-    except:
+    except Exception as exc:
+        logger.exception(exc)
         f.write(content)
     f.close()
 
 
 def show_diff_ask_ok(source, revised, fn):
     # Show user a diff on the console to accept changes.
-    source = re.sub(r"\s*\n", "\n", source) # old files had trailing spaces
-    revised = re.sub(r"\s*\n", "\n", revised) # be consistent in normalization
-    if source == revised: return False # nothing to do
-    def split_lines(s): return [l+"\n" for l in s.split("\n")]
-    import sys
+    source = re.sub(r"\s*\n", "\n", source)  # old files had trailing spaces
+    revised = re.sub(r"\s*\n", "\n", revised)  # be consistent in normalization
+    if source == revised:
+        return False  # nothing to do
+
+    def split_lines(s):
+        return [line + "\n" for line in s.split("\n")]
+
     from difflib import unified_diff
-    sys.stdout.writelines(unified_diff(split_lines(source), split_lines(revised), fromfile=fn, tofile=fn))
+    import sys
+
+    sys.stdout.writelines(
+        unified_diff(split_lines(source), split_lines(revised), fromfile=fn, tofile=fn)
+    )
     return input("Apply change? (y/n) ").strip() == "y"
 
 
 def write_json(data, destination):
     return write(
-        json.dumps(data,
-            sort_keys=True,
-            indent=2,
-            default=format_datetime
-        ),
-        destination
+        json.dumps(data, sort_keys=True, indent=2, default=format_datetime), destination
     )
 
 
@@ -407,11 +449,13 @@ def read(destination):
         with open(destination) as f:
             return f.read()
 
+
 # dict1 gets overwritten with anything in dict2
 
 
 def merge(dict1, dict2):
     return dict(list(dict1.items()) + list(dict2.items()))
+
 
 # de-dupe a list, taken from:
 # http://stackoverflow.com/questions/480214/how-do-you-remove-duplicates-from-a-list-in-python-whilst-preserving-order
@@ -422,8 +466,6 @@ def uniq(seq):
     seen_add = seen.add
     return [x for x in seq if x not in seen and not seen_add(x)]
 
-import os
-import errno
 
 # mkdir -p in python, from:
 # http://stackoverflow.com/questions/600268/mkdir-p-functionality-in-python
@@ -442,13 +484,14 @@ def mkdir_p(path):
 def xpath_regex(doc, element, pattern):
     return doc.xpath(
         "//%s[re:match(text(), '%s')]" % (element, pattern),
-        namespaces={"re": "http://exslt.org/regular-expressions"})
+        namespaces={"re": "http://exslt.org/regular-expressions"},
+    )
+
 
 # taken from http://effbot.org/zone/re-sub.htm#unescape-html
 
 
 def unescape(text):
-
     def remove_unicode_control(str):
         remove_re = re.compile('[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]')
         return remove_re.sub('', str)
@@ -472,7 +515,7 @@ def unescape(text):
                 pass
         return text  # leave as is
 
-    text = re.sub("&#?\w+;", fixup, text)
+    text = re.sub(r"&#?\w+;", fixup, text)
     text = remove_unicode_control(text)
     return text
 
@@ -480,52 +523,40 @@ def unescape(text):
 def extract_bills(text, session):
     bill_ids = []
 
-    p = re.compile('((S\.|H\.)(\s?J\.|\s?R\.|\s?Con\.| ?)(\s?Res\.)*\s?\d+)', flags=re.IGNORECASE)
+    p = re.compile(
+        r'((S\.|H\.)(\s?J\.|\s?R\.|\s?Con\.| ?)(\s?Res\.)*\s?\d+)', flags=re.IGNORECASE
+    )
     bill_matches = p.findall(text)
 
     if bill_matches:
         for b in bill_matches:
-            bill_text = "%s-%s" % (b[0].lower().replace(" ", '').replace('.', '').replace("con", "c"), session)
+            bill_text = "%s-%s" % (
+                b[0].lower().replace(" ", '').replace('.', '').replace("con", "c"),
+                session,
+            )
             if bill_text not in bill_ids:
                 bill_ids.append(bill_text)
 
     return bill_ids
 
+
 # uses config values if present
 
 
 def cache_dir():
-    cache = None
-
-    if config:
-        output = config.get('output', None)
-        if output:
-            cache = output.get('cache', None)
-
-    if not cache:
-        cache = "cache"
-
-    return cache
+    return CongressConstants.CACHE_FOLDER_FILEPATH.value
 
 
 def test_cache_dir():
     return "test/fixtures/cache"
 
+
 # uses config values if present
 
 
 def data_dir():
-    data = None
+    return CongressConstants.DATA_FOLDER_FILEPATH.value
 
-    if config:
-        output = config.get('output', None)
-        if output:
-            data = output.get('data', None)
-
-    if not data:
-        data = "data"
-
-    return data
 
 # if email settings are supplied, email the text - otherwise, just print it
 
@@ -535,7 +566,7 @@ def admin(body):
         if isinstance(body, Exception):
             body = format_exception(body)
 
-        logging.error(body)  # always print it
+        logger.error(body)  # always print it
 
         if config:
             details = config.get('email', None)
@@ -550,6 +581,7 @@ def admin(body):
 def format_exception(exception):
     exc_type, exc_value, exc_traceback = sys.exc_info()
     return "\n".join(traceback.format_exception(exc_type, exc_value, exc_traceback))
+
 
 # this should only be called if the settings are definitely there
 
@@ -576,7 +608,7 @@ def send_email(message):
     finally:
         server.quit()
 
-    logging.info("Sent email to %s" % settings['to'])
+    logger.info("Sent email to %s" % settings['to'])
 
 
 def make_node(parent, tag, text, **attrs):
@@ -603,38 +635,47 @@ def slice_map(m, *args):
             n[arg] = m[arg]
     return n
 
+
 # Load a YAML file directly.
 
 
 def direct_yaml_load(filename):
     import yaml
+
     try:
-        from yaml import CLoader as Loader, CDumper as Dumper
+        from yaml import CLoader as Loader
     except ImportError:
-        from yaml import Loader, Dumper
+        from yaml import Loader
     return yaml.load(open(filename), Loader=Loader)
+
 
 # Load a pickle file.
 
 
 def pickle_load(filename):
     import pickle
+
     return pickle.load(open(filename, 'rb'))
+
 
 # Write to a pickle file.
 
 
 def pickle_write(data, filename):
     import pickle
+
     mkdir_p(os.path.dirname(filename))
     return pickle.dump(data, open(filename, 'wb'))
+
 
 # Get the hash used to verify the contents of a file.
 
 
 def get_file_hash(filename):
     import hashlib
+
     return hashlib.sha1(open(filename, 'rb').read()).hexdigest()
+
 
 # Get the location of the cached version of a file.
 
@@ -642,17 +683,23 @@ def get_file_hash(filename):
 def get_cache_filename(filename):
     return os.path.join(cache_dir(), filename + '.pickle')
 
+
 # Check if the cached file is newer.
 
 
 def check_cached_file(filename, cache_filename):
-    return (os.path.exists(cache_filename) and os.stat(cache_filename).st_mtime > os.stat(filename).st_mtime)
+    return (
+        os.path.exists(cache_filename)
+        and os.stat(cache_filename).st_mtime > os.stat(filename).st_mtime
+    )
+
 
 # Problem with finding a cache entry.
 
 
 class CacheError(LookupError):
     pass
+
 
 # Load a cached file.
 
@@ -661,7 +708,9 @@ def cache_load(cache_filename, file_hash):
     try:
         cache_data = pickle_load(cache_filename)
     except IOError:
-        raise CacheError("Could not retrieve potential cache file: %s" % (cache_filename))
+        raise CacheError(
+            "Could not retrieve potential cache file: %s" % (cache_filename)
+        )
 
     # A cache file has a specific structure.
     if "hash" not in cache_data or "data" not in cache_data:
@@ -669,9 +718,12 @@ def cache_load(cache_filename, file_hash):
 
     # If the hashes don't match, we've retrieved the cache for something else.
     if cache_data["hash"] != file_hash:
-        raise CacheError("Hashes do not match: %s, %s" % (file_hash, cache_data["hash"]))
+        raise CacheError(
+            "Hashes do not match: %s, %s" % (file_hash, cache_data["hash"])
+        )
 
     return cache_data["data"]
+
 
 # Cache a file.
 
@@ -679,6 +731,7 @@ def cache_load(cache_filename, file_hash):
 def cache_write(file_data, filename, file_hash):
     cache_data = {"hash": file_hash, "data": file_data}
     return pickle_write(cache_data, filename)
+
 
 # Attempt to load a cached version of a YAML file before loading the YAML file directly.
 
@@ -692,7 +745,7 @@ def yaml_load(filename):
         yaml_data = cache_load(cache_filename, file_hash)
     except CacheError:
         # We don't have a cached version of the requested YAML file available, so we have to load it directly.
-        logging.warn("Using original YAML file...")
+        logger.warn("Using original YAML file...")
 
         # Load the requested YAML file directly.
         yaml_data = direct_yaml_load(filename)
@@ -701,13 +754,14 @@ def yaml_load(filename):
         cache_write(yaml_data, cache_filename, file_hash)
     else:
         # We have a cached version of the requested YAML file available, so we can use it.
-        logging.info("Using cached YAML file...")
+        logger.info("Using cached YAML file...")
 
     return yaml_data
 
 
 # Make sure we have the congress-legislators repository available.
 has_congress_legislators_repo = False
+
 
 def require_congress_legislators_repo():
     global has_congress_legislators_repo
@@ -718,22 +772,29 @@ def require_congress_legislators_repo():
 
     # Clone the congress-legislators repo if we don't have it.
     if not os.path.exists("congress-legislators"):
-        logging.warn("Cloning the congress-legislators repo...")
-        os.system("git clone -q --depth 1 https://github.com/unitedstates/congress-legislators congress-legislators")
+        logger.warn("Cloning the congress-legislators repo...")
+        os.system(
+            "git clone -q --depth 1 https://github.com/unitedstates/congress-legislators congress-legislators"
+        )
 
     if os.environ.get("UPDATE_CONGRESS_LEGISLATORS") != "NO":
         # Update the repo so we have the latest.
-        logging.warn("Updating the congress-legislators repo...")
+        logger.warn("Updating the congress-legislators repo...")
         # these two == git pull, but git pull ignores -q on the merge part so is less quiet
-        os.system("cd congress-legislators; git fetch -pq; git merge --ff-only -q origin/main")
+        os.system(
+            "cd congress-legislators; git fetch -pq; git merge --ff-only -q origin/main"
+        )
 
     # We now have the congress-legislators repo.
     has_congress_legislators_repo = True
 
+
 lookup_legislator_cache = []
 
 
-def lookup_legislator(congress, role_type, name, state, party, when, id_requested, exclude=set()):
+def lookup_legislator(
+    congress, role_type, name, state, party, when, id_requested, exclude=set()
+):
     # This is a basic lookup function given the legislator's name, state, party,
     # and the date of the vote.
 
@@ -742,12 +803,16 @@ def lookup_legislator(congress, role_type, name, state, party, when, id_requeste
     global lookup_legislator_cache
     if not lookup_legislator_cache:
         require_congress_legislators_repo()
-        lookup_legislator_cache = {}  # from Congress number to list of (moc,term) tuples that might be in that Congress
+        lookup_legislator_cache = (
+            {}
+        )  # from Congress number to list of (moc,term) tuples that might be in that Congress
         for filename in ("legislators-historical", "legislators-current"):
             for moc in yaml_load("congress-legislators/%s.yaml" % (filename)):
                 for term in moc["terms"]:
-                    for c in range(congress_from_legislative_year(int(term['start'][0:4])) - 1,
-                                    congress_from_legislative_year(int(term['end'][0:4])) + 1 + 1):
+                    for c in range(
+                        congress_from_legislative_year(int(term['start'][0:4])) - 1,
+                        congress_from_legislative_year(int(term['end'][0:4])) + 1 + 1,
+                    ):
                         lookup_legislator_cache.setdefault(c, []).append((moc, term))
 
     def to_ascii(name):
@@ -755,14 +820,19 @@ def lookup_legislator(congress, role_type, name, state, party, when, id_requeste
         if not isinstance(name, str):
             return name
         import unicodedata
-        return "".join(c for c in unicodedata.normalize('NFKD', name) if not unicodedata.combining(c))
+
+        return "".join(
+            c
+            for c in unicodedata.normalize('NFKD', name)
+            if not unicodedata.combining(c)
+        )
 
     # Scan all of the terms that cover 'when' for a match.
     if isinstance(when, datetime.datetime):
         when = when.date()
     when = when.isoformat()
     name_parts = to_ascii(name).split(", ", 1)
-    matches = { }
+    matches = {}
     for moc, term in lookup_legislator_cache[congress]:
         # Make sure the date is surrounded by the term start/end dates.
         if term['start'] > when:
@@ -775,7 +845,18 @@ def lookup_legislator(congress, role_type, name, state, party, when, id_requeste
             continue
         if term['state'] != state:
             continue
-        if term['party'][0] != party and name not in ("Laughlin", "Crenshaw", "Goode", "Martinez", "Parker", "Emerson", "Tauzin", "Hayes", "Deal", "Forbes"):
+        if term['party'][0] != party and name not in (
+            "Laughlin",
+            "Crenshaw",
+            "Goode",
+            "Martinez",
+            "Parker",
+            "Emerson",
+            "Tauzin",
+            "Hayes",
+            "Deal",
+            "Forbes",
+        ):
             continue
 
         # When doing process-of-elimination matching, don't match on people we've already seen.
@@ -796,19 +877,26 @@ def lookup_legislator(congress, role_type, name, state, party, when, id_requeste
             name_info.update(name_info_rec)  # override with the other_name information
 
             # check last name
-            if name_parts[0] != to_ascii(name_info['last']) \
-                    and name_parts[0] not in to_ascii(name_info['last']).split(" "):
-                  continue  # no match
+            if name_parts[0] != to_ascii(name_info['last']) and name_parts[
+                0
+            ] not in to_ascii(name_info['last']).split(" "):
+                continue  # no match
 
             # Compare the first name. Allow it to match either the first or middle name,
             # and an initialized version of the first name (i.e. "E." matches "Eddie").
             # Test the whole string (so that "Jo Ann" is compared to "Jo Ann") but also
             # the first part of a string split (so "E. B." is compared as "E." to "Eddie").
-            first_names = (to_ascii(name_info['first']), to_ascii(name_info.get('nickname', "")), to_ascii(name_info['first'])[0] + ".")
-            if len(name_parts) >= 2 and \
-                    name_parts[1] not in first_names and \
-                    name_parts[1].split(" ")[0] not in first_names:
-                  continue
+            first_names = (
+                to_ascii(name_info['first']),
+                to_ascii(name_info.get('nickname', "")),
+                to_ascii(name_info['first'])[0] + ".",
+            )
+            if (
+                len(name_parts) >= 2
+                and name_parts[1] not in first_names
+                and name_parts[1].split(" ")[0] not in first_names
+            ):
+                continue
 
             break  # match
         else:
@@ -821,28 +909,36 @@ def lookup_legislator(congress, role_type, name, state, party, when, id_requeste
 
     # Return if there is a unique match.
     if len(matches) == 0:
-        logging.warn("Could not match name %s (%s-%s; %s) to any legislator." % (name, state, party, when))
+        logger.warn(
+            "Could not match name %s (%s-%s; %s) to any legislator."
+            % (name, state, party, when)
+        )
         return None
     if len(matches) > 1:
-        logging.warn("Multiple matches of name %s (%s-%s; %s) to legislators (%s; excludes %s)." % (name, state, party, when, str(matches), str(exclude)))
+        logger.warn(
+            "Multiple matches of name %s (%s-%s; %s) to legislators (%s; excludes %s)."
+            % (name, state, party, when, str(matches), str(exclude))
+        )
         return None
     return list(matches)[0]
 
 
-
 class UnmatchedIdentifer(Exception):
-
     def __init__(self, id_type, id_value, desired_id_type):
-        super(UnmatchedIdentifer, self).__init__("%s=%s => %s" % (id_type, str(id_value), desired_id_type))
+        super(UnmatchedIdentifer, self).__init__(
+            "%s=%s => %s" % (id_type, str(id_value), desired_id_type)
+        )
+
 
 _translate_legislator_id_cache = None
+
 
 def translate_legislator_id(source_id_type, source_id, dest_id_type):
     global _translate_legislator_id_cache
     # On the first load, cache all of the legislators' ids in memory.
     if not _translate_legislator_id_cache:
         require_congress_legislators_repo()
-        _translate_legislator_id_cache = { }
+        _translate_legislator_id_cache = {}
         for filename in ("legislators-historical", "legislators-current"):
             for moc in yaml_load("congress-legislators/%s.yaml" % (filename)):
                 for id_type, id_value in moc["id"].items():
@@ -859,6 +955,7 @@ def translate_legislator_id(source_id_type, source_id, dest_id_type):
     except KeyError:
         raise UnmatchedIdentifer(source_id_type, source_id, dest_id_type)
 
+
 # adapted from https://gist.github.com/tcwalther/ae058c64d5d9078a9f333913718bba95,
 # which was based on http://stackoverflow.com/a/21919644/487556.
 # This provides a with-block object that prevents Ctrl+C (SIGINT)
@@ -867,17 +964,24 @@ def translate_legislator_id(source_id_type, source_id, dest_id_type):
 # operations aren't killed mid-write resulting in a corrupt file.
 class NoInterrupt(object):
     def __init__(self, *signals):
-        if not signals: signals = [signal.SIGTERM, signal.SIGINT]
-        self.sigs = signals        
+        if not signals:
+            signals = [signal.SIGTERM, signal.SIGINT]
+        self.sigs = signals
+
     def __enter__(self):
         self.signal_received = {}
         self.old_handlers = {}
         for sig in self.sigs:
-            def handler(s, frame, sig=sig): # sig=sig ensures the variable is captured by value
+
+            def handler(
+                s, frame, sig=sig
+            ):  # sig=sig ensures the variable is captured by value
                 self.signal_received[sig] = (s, frame)
                 # Note: in Python 3.5, you can use signal.Signals(sig).name
-                logging.info('Signal %s received. Delaying KeyboardInterrupt.' % sig)
+                logger.info('Signal %s received. Delaying KeyboardInterrupt.' % sig)
+
             self.old_handlers[sig] = signal.signal(sig, handler)
+
     def __exit__(self, type, value, traceback):
         # Restore signal handlers that were in place before entering the with-block.
         for sig in self.sigs:

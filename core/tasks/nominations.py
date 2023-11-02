@@ -1,11 +1,8 @@
-from congress.tasks import utils
-import os
-import os.path
-import re
-from lxml import html, etree
 import logging
 
-from congress.tasks import nomination_info
+from lxml import html
+
+from core.tasks import nomination_info, utils
 
 
 def run(options):
@@ -21,16 +18,21 @@ def run(options):
             if options.get("fast", False):
                 logging.warn("No nominations changed.")
             else:
-                logging.error("Error figuring out which nominations to download, aborting.")
+                logging.error(
+                    "Error figuring out which nominations to download, aborting."
+                )
             return None
 
         limit = options.get('limit', None)
         if limit:
-            to_fetch = to_fetch[:int(limit)]
+            to_fetch = to_fetch[: int(limit)]
 
-    logging.warn("Going to fetch %i nominations from congress #%s" % (len(to_fetch), congress))
+    logging.warn(
+        "Going to fetch %i nominations from congress #%s" % (len(to_fetch), congress)
+    )
 
-    saved_nominations = utils.process_set(to_fetch, nomination_info.fetch_nomination, options)
+    utils.process_set(to_fetch, nomination_info.fetch_nomination, options)
+
 
 # page through listings for bills of a particular congress
 
@@ -66,6 +68,7 @@ def nomination_ids_for(congress, options={}):
 def page_cache_for(congress):
     return "%s/nominations/pages/search.html" % congress
 
+
 # unlike bills.py, we're going to fetch the page instead of producing the URL,
 # since a POST is required.
 
@@ -93,10 +96,7 @@ def page_for(congress, options):
     post_options.update(options)
 
     # unused: never cache search listing
-    cache = page_cache_for(congress)
+    page_cache_for(congress)
 
-    page = utils.download("http://thomas.loc.gov/cgi-bin/thomas",
-                          None,
-                          post_options
-                          )
+    page = utils.download("http://thomas.loc.gov/cgi-bin/thomas", None, post_options)
     return page

@@ -33,14 +33,12 @@ setuptools.setup(
         'packaging',
     ],
     entry_points={
-        'console_scripts': [
-            'usc-run=congress.run:main'
-        ],
+        'console_scripts': ['usc-run=congress.run:main'],
     },
     scripts=[
         'scripts/bills.sh',
         'scripts/statutes.sh',
         'scripts/votes.sh',
-        'scripts/voteview.sh'
+        'scripts/voteview.sh',
     ],
 )
