@@ -410,13 +410,13 @@ def write(content, destination, options={}):
     # Save the content to disk.
     logger.info(f'Saving file with filepath : "{destination}".')
     mkdir_p(os.path.dirname(destination))
-    f = open(destination, 'wb')
-    try:
-        f.write(content.encode('utf-8'))
-    except Exception as exc:
-        logger.exception(exc)
-        f.write(content)
-    f.close()
+    with open(destination, 'wb') as f:
+        if type(content) == str:
+            f.write(content.encode('utf-8'))
+        elif type(content) == bytes:
+            f.write(content)
+        else:
+            logger.error(f"Content for {destination} is not a string or bytes.")
 
 
 def show_diff_ask_ok(source, revised, fn):

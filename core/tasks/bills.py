@@ -152,6 +152,11 @@ def process_bill(bill_id, options):
 
     # Read FDSys bulk data file.
     xml_as_dict = read_fdsys_bulk_bill_status_file(fdsys_xml_path, bill_id)
+    # save full bill_status data as .json
+    bill_status_json_filepath = os.path.dirname(fdsys_xml_path) + '/bill_status.json'
+    logger.info(f'Saving "bill_status.json" file with filepath: "{bill_status_json_filepath}".')
+    with open(bill_status_json_filepath, 'w') as f:
+        json.dump(xml_as_dict, f)
     bill_data = form_bill_json_dict(xml_as_dict)
     if isinstance(bill_data, str):  # Non-error failure
         return {
