@@ -260,6 +260,35 @@ def check_file_system_for_missing_bill_statuses_data_json_files(
     return missing_bill_statuses
 
 
+def check_file_system_for_missing_bill_statuses_json_files(
+    bill_statuses_info: dict,
+):
+    local_prefix = '/bills_data/data'
+    missing_bill_statuses = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+    for congress_num, per_bill_type_stats in bill_statuses_info.items():
+        for bill_type, bill_type_stats in per_bill_type_stats.items():
+            if bill_type == 'total':
+                missing_bill_statuses[congress_num]['total'] = bill_type_stats
+                continue
+            for bill_status in bill_type_stats['billstatuses']:
+                bill_status_json_filepath = bill_status["local_filepath"].replace(
+                    'fdsys_billstatus.xml', 'bill_status.json'
+                )
+                local_filepath = pathlib.Path(f'{local_prefix}/{bill_status_json_filepath}')
+                if not local_filepath.exists():
+                    missing_bill_statuses[bill_status['congress']][
+                        bill_status['billtype']
+                    ]['billstatuses'].append(bill_status)
+    for congress_num, per_bill_type_stats in missing_bill_statuses.items():
+        total_per_congress = 0
+        for bill_type, bill_type_stats in per_bill_type_stats.items():
+            if bill_type == 'total':
+                continue
+            total_per_congress += len(bill_type_stats['billstatuses'])
+        missing_bill_statuses[congress_num]['total_missing'] = total_per_congress
+    return missing_bill_statuses
+
+
 def check_file_system_for_missing_bills(bills_info: dict):
     local_prefix = '/bills_data/data'
     missing_bills = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
@@ -497,6 +526,28 @@ def main(
             logger.info(
                 f'Congress: "{congress_num}" has total: "{per_bill_type_stats["total"]}" bill statuses and missing: '
                 f'"{per_bill_type_stats["total_missing"]}" bill statuses data.json files.'
+            )
+        missing_bill_statuses_json_files = (
+            check_file_system_for_missing_bill_statuses_json_files(
+                bill_statuses_info
+            )
+        )
+        total_missing_bill_statuses_json_across_congresses = sum(
+            {
+                k: v['total_missing']
+                for k, v in missing_bill_statuses_json_files.items()
+            }.values()
+        )
+        logger.info(
+            f'local file system missing total: "{total_missing_bill_statuses_json_across_congresses}" bill_status.json files.'
+        )
+        for (
+            congress_num,
+            per_bill_type_stats,
+        ) in missing_bill_statuses_json_files.items():
+            logger.info(
+                f'Congress: "{congress_num}" has total: "{per_bill_type_stats["total"]}" bill statuses and missing: '
+                f'"{per_bill_type_stats["total_missing"]}" bill statuses bill_status.json files.'
             )
 
     if skip_show_bills_info:
