@@ -24,9 +24,7 @@ def run(options):
         to_fetch = bill_id.split(",")
     else:
         if options.get("matching_action_regex"):
-            options["matching_action_regex"] = re.compile(
-                options["matching_action_regex"]
-            )
+            options["matching_action_regex"] = re.compile(options["matching_action_regex"])
 
         to_fetch = get_bills_to_process(options)
 
@@ -91,9 +89,7 @@ def get_bills_to_process(options):
         path = get_data_path(congress)
         if not os.path.exists(path):
             continue
-        bill_types = [
-            bill_type for bill_type in os.listdir(path) if not bill_type.startswith(".")
-        ]
+        bill_types = [bill_type for bill_type in os.listdir(path) if not bill_type.startswith(".")]
 
         for bill_type in sorted(bill_types):
 
@@ -103,24 +99,18 @@ def get_bills_to_process(options):
             if not os.path.exists(path):
                 continue
             bills = [bill for bill in os.listdir(path) if not bill.startswith(".")]
-            for bill_type_and_number in sorted(
-                bills, key=lambda x: int(x.replace(bill_type, ""))
-            ):
+            for bill_type_and_number in sorted(bills, key=lambda x: int(x.replace(bill_type, ""))):
 
                 bill_id = bill_type_and_number + "-" + congress
 
                 if options.get("matching_action_regex"):
                     # Include bills that have an action that matches a regular expression.
-                    fn = get_data_path(
-                        congress, bill_type, bill_type_and_number, "data.json"
-                    )
+                    fn = get_data_path(congress, bill_type, bill_type_and_number, "data.json")
                     if os.path.exists(fn):
                         with open(fn) as f:
                             bill = json.load(f)
                             for action in bill['actions']:
-                                if action.get('text') and options[
-                                    "matching_action_regex"
-                                ].search(action['text']):
+                                if action.get('text') and options["matching_action_regex"].search(action['text']):
                                     yield bill_id
                     continue  # don't check modification dates
 
@@ -186,12 +176,8 @@ def process_bill(bill_id, options):
 
     # Mark this bulk data file as processed by saving its lastmod
     # file under a new path.
-    fdsys_billstatus_lastmod_filepath = os.path.join(
-        os.path.dirname(fdsys_xml_path), "data-fromfdsys-lastmod.txt"
-    )
-    logger.info(
-        f'Saving "data-fromfdsys-lastmod.txt" file with filepath: "{fdsys_billstatus_lastmod_filepath}".'
-    )
+    fdsys_billstatus_lastmod_filepath = os.path.join(os.path.dirname(fdsys_xml_path), "data-fromfdsys-lastmod.txt")
+    logger.info(f'Saving "data-fromfdsys-lastmod.txt" file with filepath: "{fdsys_billstatus_lastmod_filepath}".')
     utils.write(
         utils.read(_path_to_billstatus_file(bill_id).replace(".xml", "-lastmod.txt")),
         fdsys_billstatus_lastmod_filepath,
@@ -211,16 +197,12 @@ def process_bill(bill_id, options):
 
 
 def _path_to_billstatus_file(bill_id):
-    return output_for_bill(
-        bill_id, govinfo.FDSYS_BILLSTATUS_FILENAME, is_data_dot=False
-    )
+    return output_for_bill(bill_id, govinfo.FDSYS_BILLSTATUS_FILENAME, is_data_dot=False)
 
 
 def read_fdsys_bulk_bill_status_file(fn, bill_id):
     fdsys_billstatus = utils.read(fn)
-    return xmltodict.parse(
-        fdsys_billstatus, force_list=('item', 'amendment', 'committeeReport', 'link')
-    )
+    return xmltodict.parse(fdsys_billstatus, force_list=('item', 'amendment', 'committeeReport', 'link'))
 
 
 def form_bill_json_dict(xml_as_dict):
@@ -242,9 +224,7 @@ def form_bill_json_dict(xml_as_dict):
 
     bill_dict = xml_as_dict['billStatus']['bill']
     if schema_version >= parse_version('3.0.0'):
-        bill_id = build_bill_id(
-            bill_dict['type'].lower(), bill_dict['number'], bill_dict['congress']
-        )
+        bill_id = build_bill_id(bill_dict['type'].lower(), bill_dict['number'], bill_dict['congress'])
     else:
         bill_id = build_bill_id(
             bill_dict['billType'].lower(),
@@ -257,15 +237,11 @@ def form_bill_json_dict(xml_as_dict):
         bill_id,
         bill_info.current_title_for(titles, 'official'),
     )
-    status, status_date = bill_info.latest_status(
-        actions, bill_dict.get('introducedDate', '')
-    )
+    status, status_date = bill_info.latest_status(actions, bill_dict.get('introducedDate', ''))
 
     sponsors = bill_dict.get('sponsors')
 
-    if sponsors is None and bill_dict['titles']['item'][0]['title'].startswith(
-        "Reserved "
-    ):
+    if sponsors is None and bill_dict['titles']['item'][0]['title'].startswith("Reserved "):
         logger.info(
             "[%s] Skipping reserved bill number with no sponsor (%s)"
             % (bill_id, bill_dict['titles']['item'][0]['title'])
@@ -286,9 +262,7 @@ def form_bill_json_dict(xml_as_dict):
     if schema_version >= parse_version('3.0.0'):
         legislativeSubjects = bill_dict.get('subjects', {}).get('legislativeSubjects')
     else:
-        legislativeSubjects = bill_dict['subjects']['billSubjects'][
-            'legislativeSubjects'
-        ]
+        legislativeSubjects = bill_dict['subjects']['billSubjects']['legislativeSubjects']
 
     if schema_version >= parse_version('3.0.0'):
         billSummaries = bill_dict.get('summaries', {}).get('summary')
@@ -304,12 +278,8 @@ def form_bill_json_dict(xml_as_dict):
 
     bill_data = {
         'bill_id': bill_id,
-        'bill_type': bill_dict.get(
-            'type' if schema_version >= parse_version('3.0.0') else 'billType'
-        ).lower(),
-        'number': bill_dict.get(
-            'number' if schema_version >= parse_version('3.0.0') else 'billNumber'
-        ),
+        'bill_type': bill_dict.get('type' if schema_version >= parse_version('3.0.0') else 'billType').lower(),
+        'number': bill_dict.get('number' if schema_version >= parse_version('3.0.0') else 'billNumber'),
         'congress': bill_dict.get('congress'),
         'url': billstatus_url_for(bill_id),
         'introduced_at': bill_dict.get('introducedDate', ''),
@@ -333,23 +303,13 @@ def form_bill_json_dict(xml_as_dict):
         if bill_dict.get('policyArea')
         else None,
         'subjects': sorted(
-            (
-                [_fixup_top_term_case(bill_dict['policyArea']['name'])]
-                if bill_dict.get('policyArea')
-                else []
-            )
-            + (
-                [item['name'] for item in legislativeSubjects['item']]
-                if legislativeSubjects
-                else []
-            )
+            ([_fixup_top_term_case(bill_dict['policyArea']['name'])] if bill_dict.get('policyArea') else [])
+            + ([item['name'] for item in legislativeSubjects['item']] if legislativeSubjects else [])
         ),
         'related_bills': bill_info.related_bills_for(bill_dict.get('relatedBills')),
         'committees': bill_info.committees_for(billCommittees),
         'amendments': bill_info.amendments_for(bill_dict.get('amendments')),
-        'committee_reports': bill_info.committee_reports_for(
-            bill_dict.get('committeeReports')
-        ),
+        'committee_reports': bill_info.committee_reports_for(bill_dict.get('committeeReports')),
         'updated_at': bill_dict.get('updateDate', ''),
     }
 
@@ -368,11 +328,8 @@ def build_bill_id(bill_type, bill_number, congress):
 
 def billstatus_url_for(bill_id):
     bill_type, bill_number, congress = utils.split_bill_id(bill_id)
-    return (
-        govinfo.BULKDATA_BASE_URL
-        + 'BILLSTATUS/{0}/{1}/BILLSTATUS-{0}{1}{2}.xml'.format(
-            congress, bill_type, bill_number
-        )
+    return govinfo.BULKDATA_BASE_URL + 'BILLSTATUS/{0}/{1}/BILLSTATUS-{0}{1}{2}.xml'.format(
+        congress, bill_type, bill_number
     )
 
 
@@ -445,9 +402,7 @@ def reparse_actions(bill_id, options):
                 del action[key]
         action.update(new_action)
 
-    status, status_date = bill_info.latest_status(
-        bill_data['actions'], bill_data['introduced_at']
-    )
+    status, status_date = bill_info.latest_status(bill_data['actions'], bill_data['introduced_at'])
     bill_data['status'] = status
     bill_data['status_at'] = status_date
 

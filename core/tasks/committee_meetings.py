@@ -48,9 +48,7 @@ def run(options):
         committees[c["thomas_id"]] = c
         if "house_committee_id" in c:
             committees[c["house_committee_id"] + "00"] = c
-        c["subcommittees"] = dict(
-            (s["thomas_id"], s) for s in c.get("subcommittees", [])
-        )
+        c["subcommittees"] = dict((s["thomas_id"], s) for s in c.get("subcommittees", []))
 
     if "senate" in chambers:
         print("Fetching Senate meetings...")
@@ -113,17 +111,12 @@ def fetch_senate_committee_meetings(committees, options):
 
         # Validate committee code.
         try:
-            committee_code, subcommittee_code = re.match(
-                r"(\D+)(\d+)$", committee_id
-            ).groups()
+            committee_code, subcommittee_code = re.match(r"(\D+)(\d+)$", committee_id).groups()
             if committee_code not in committees:
                 raise ValueError(committee_code)
             if subcommittee_code == "00":
                 subcommittee_code = None
-            if (
-                subcommittee_code
-                and subcommittee_code not in committees[committee_code]["subcommittees"]
-            ):
+            if subcommittee_code and subcommittee_code not in committees[committee_code]["subcommittees"]:
                 raise ValueError(subcommittee_code)
         except Exception as exc:
             logging.exception(exc)
@@ -149,13 +142,9 @@ def fetch_senate_committee_meetings(committees, options):
             guid = str(uuid.uuid4())
 
         # Scrape the topic text for mentions of bill numbers.
-        congress = utils.congress_from_legislative_year(
-            utils.current_legislative_year(occurs_at)
-        )
+        congress = utils.congress_from_legislative_year(utils.current_legislative_year(occurs_at))
         bills = []
-        bill_number_re = re.compile(
-            r"(hr|s|hconres|sconres|hjres|sjres|hres|sres)\s?(\d+)", re.I
-        )
+        bill_number_re = re.compile(r"(hr|s|hconres|sconres|hjres|sjres|hres|sres)\s?(\d+)", re.I)
         for bill_match in bill_number_re.findall(topic.replace(".", "")):
             bills.append(bill_match[0].lower() + bill_match[1] + "-" + str(congress))
 
@@ -237,9 +226,7 @@ def fetch_house_committee_meetings(committees, options):
             if not event_id:
                 continue  # weird empty event showed up
             event_id = event_id.group(1)
-            pubDate = datetime.datetime.fromtimestamp(
-                mktime(parsedate(mtg.xpath("string(pubDate)")))
-            )
+            pubDate = datetime.datetime.fromtimestamp(mktime(parsedate(mtg.xpath("string(pubDate)"))))
             # skip old records of meetings, some of which just give error pages
             if pubDate < (datetime.datetime.now() - datetime.timedelta(days=60)):
                 continue
@@ -251,9 +238,7 @@ def fetch_house_committee_meetings(committees, options):
             seen_meetings.add(event_id)
 
             # this loads the xml from the page and sends the xml to parse_house_committee_meeting
-            load_xml_from_page(
-                eventurl, options, existing_meetings, committees, event_id, meetings
-            )
+            load_xml_from_page(eventurl, options, existing_meetings, committees, event_id, meetings)
             # if bad zipfile
             if load_xml_from_page is False:
                 continue
@@ -280,12 +265,8 @@ def fetch_meeting_from_event_id(committees, options, load_id):
 
     while current_id <= end_id:
         event_id = str(current_id)
-        event_url = (
-            "http://docs.house.gov/Committee/Calendar/ByEvent.aspx?EventID=" + event_id
-        )
-        load_xml_from_page(
-            event_url, options, existing_meetings, committees, event_id, meetings
-        )
+        event_url = "http://docs.house.gov/Committee/Calendar/ByEvent.aspx?EventID=" + event_id
+        load_xml_from_page(event_url, options, existing_meetings, committees, event_id, meetings)
         # bad zipfile
         if load_xml_from_page is False:
             continue
@@ -295,9 +276,7 @@ def fetch_meeting_from_event_id(committees, options, load_id):
     return meetings
 
 
-def load_xml_from_page(
-    eventurl, options, existing_meetings, committees, event_id, meetings
-):
+def load_xml_from_page(eventurl, options, existing_meetings, committees, event_id, meetings):
     # Load the HTML page for the event and use the mechanize library to
     # submit the form that gets the meeting XML. TODO Simplify this when
     # the House makes the XML available at an actual URL.
@@ -381,9 +360,7 @@ def extract_meeting_package(eventurl, event_id, options):
             if "WList" in name:
                 bytes = package.read(name)
                 witness_tree = lxml.etree.fromstring(bytes)
-                witness_info = parse_witness_list(
-                    witness_tree, uploaded_documents, event_id
-                )
+                witness_info = parse_witness_list(witness_tree, uploaded_documents, event_id)
                 witnesses = witness_info["hearing_witness_info"]
             else:
                 bytes = package.read(name)
@@ -431,14 +408,10 @@ def parse_witness_list(witness_tree, uploaded_documents, event_id):
             document = {}
             published_on = doc.xpath("string(@publish-date)")
             try:
-                document["published_on"] = datetime.datetime.strptime(
-                    published_on, "%Y-%m-%dT%H:%M:%S.%f"
-                )
+                document["published_on"] = datetime.datetime.strptime(published_on, "%Y-%m-%dT%H:%M:%S.%f")
             except Exception as exc:
                 logging.exception(exc)
-                document["published_on"] = datetime.datetime.strptime(
-                    published_on, "%Y-%m-%dT%H:%M:%S"
-                )
+                document["published_on"] = datetime.datetime.strptime(published_on, "%Y-%m-%dT%H:%M:%S")
 
             document["description"] = doc.xpath("string(description)")
             if document["description"] == '':
@@ -486,9 +459,7 @@ def parse_witness_list(witness_tree, uploaded_documents, event_id):
 
 
 # Grab a House meeting out of the DOM for the XML feed.
-def parse_house_committee_meeting(
-    event_id, dom, existing_meetings, committees, options, witnesses, uploaded_documents
-):
+def parse_house_committee_meeting(event_id, dom, existing_meetings, committees, options, witnesses, uploaded_documents):
     try:
         congress = int(dom.xpath("//@congress-num")[0])
         occurs_at = (
@@ -499,9 +470,7 @@ def parse_house_committee_meeting(
         occurs_at = datetime.datetime.strptime(occurs_at, "%Y-%m-%d %H:%M:%S")
     except Exception as exc:
         logging.exception(exc)
-        raise ValueError(
-            "Invalid meeting data (probably server error) in %s." % event_id
-        )
+        raise ValueError("Invalid meeting data (probably server error) in %s." % event_id)
 
     current_status = str(dom.xpath("string(current-status)"))
     if current_status not in ("S", "R"):
@@ -526,9 +495,7 @@ def parse_house_committee_meeting(
         room = n.xpath("string(building)") + " " + n.xpath("string(room)")
 
     bills = []
-    for bill_id in dom.xpath(
-        "meeting-documents/meeting-document[@type='BR']/legis-num"
-    ):
+    for bill_id in dom.xpath("meeting-documents/meeting-document[@type='BR']/legis-num"):
         # validating bill ids
         bill_id = house_bill_id_formatter(bill_id.text, congress)
         if bill_id is not None:
@@ -542,14 +509,10 @@ def parse_house_committee_meeting(
         document = {}
         published_on = doc.xpath("string(@publish-date)")
         try:
-            document["published_on"] = datetime.datetime.strptime(
-                published_on, "%Y-%m-%dT%H:%M:%S.%f"
-            )
+            document["published_on"] = datetime.datetime.strptime(published_on, "%Y-%m-%dT%H:%M:%S.%f")
         except Exception as exc:
             logging.exception(exc)
-            document["published_on"] = datetime.datetime.strptime(
-                published_on, "%Y-%m-%dT%H:%M:%S"
-            )
+            document["published_on"] = datetime.datetime.strptime(published_on, "%Y-%m-%dT%H:%M:%S")
         document["description"] = doc.xpath("string(description)")
         if document["description"] == '':
             document["description"] = None
@@ -582,9 +545,7 @@ def parse_house_committee_meeting(
         if document["bioguide_id"] == '':
             document["bioguide_id"] = None
 
-        document["amendmendment_number"] = doc.xpath(
-            "string(filename-metadata/amdt-num)"
-        )
+        document["amendmendment_number"] = doc.xpath("string(filename-metadata/amdt-num)")
 
         bill_id = doc.xpath("string(filename-metadata/legis-num)")
         document["bill_id"] = house_bill_id_formatter(bill_id, congress)
@@ -642,9 +603,7 @@ def parse_house_committee_meeting(
             # TODO: when does this happen?
             guid = str(uuid.uuid4())
 
-        url = (
-            "http://docs.house.gov/Committee/Calendar/ByEvent.aspx?EventID=" + event_id
-        )
+        url = "http://docs.house.gov/Committee/Calendar/ByEvent.aspx?EventID=" + event_id
 
         # return the parsed meeting
         if options.get("debug", False):

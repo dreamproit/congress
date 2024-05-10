@@ -37,9 +37,7 @@ def create_govtrack_xml(bill, options):
                     if k == "bioguide_id":
                         # remap "bioguide_id" attributes to govtrack "id"
                         k = "id"
-                        v = str(
-                            utils.translate_legislator_id('bioguide', v, 'govtrack')
-                        )
+                        v = str(utils.translate_legislator_id('bioguide', v, 'govtrack'))
                     if k == "thomas_id":
                         # remap "thomas_id" attributes to govtrack "id"
                         k = "id"
@@ -101,9 +99,7 @@ def create_govtrack_xml(bill, options):
         n = make_node(cosponsors, "cosponsor", None, **get_legislator_id_attr(cosp))
         if cosp["sponsored_at"]:
             n.set("joined", cosp["sponsored_at"])
-        if cosp.get(
-            "withdrawn_at"
-        ):  # no longer present in GPO BILLSTATUS XML schema 3.0.0
+        if cosp.get("withdrawn_at"):  # no longer present in GPO BILLSTATUS XML schema 3.0.0
             n.set("withdrawn", cosp["withdrawn_at"])
 
     actions = make_node(root, "actions", None)
@@ -173,9 +169,7 @@ def create_govtrack_xml(bill, options):
             if cmt.get("subcommittee_id", None)
             else cmt["committee_id"],
             name=cmt["committee"],
-            subcommittee=cmt.get("subcommittee").replace("Subcommittee on ", "")
-            if cmt.get("subcommittee")
-            else "",
+            subcommittee=cmt.get("subcommittee").replace("Subcommittee on ", "") if cmt.get("subcommittee") else "",
             activity=", ".join(c.title() for c in cmt["activity"]),
         )
 
@@ -202,9 +196,7 @@ def create_govtrack_xml(bill, options):
 
     amendments = make_node(root, "amendments", None)
     for amd in bill['amendments']:
-        make_node(
-            amendments, "amendment", None, number=amd["chamber"] + str(amd["number"])
-        )
+        make_node(amendments, "amendment", None, number=amd["chamber"] + str(amd["number"]))
 
     if bill.get('summary'):
         make_node(
@@ -306,18 +298,13 @@ def committees_for(committee_list):
     }
 
     def fix_subcommittee_name(name):
-        return re.sub(
-            "(.*) Subcommittee$", lambda m: "Subcommittee on " + m.group(1), name
-        )
+        return re.sub("(.*) Subcommittee$", lambda m: "Subcommittee on " + m.group(1), name)
 
     def get_activitiy_list(item):
         if not item.get('activities'):
             return []
         return sum(
-            [
-                activity_text_map.get(i['name'], [i['name']])
-                for i in item['activities']['item']
-            ],
+            [activity_text_map.get(i['name'], [i['name']]) for i in item['activities']['item']],
             [],
         )
 
@@ -330,9 +317,7 @@ def committees_for(committee_list):
     def build_dict(item):
         committee_dict = {
             'activity': get_activitiy_list(item),
-            'committee': fixup_committee_name(
-                item['chamber'] + ' ' + re.sub(" Committee$", "", item['name'])
-            ),
+            'committee': fixup_committee_name(item['chamber'] + ' ' + re.sub(" Committee$", "", item['name'])),
             'committee_id': item['systemCode'][0:-2].upper(),
         }
 
@@ -522,9 +507,7 @@ def actions_for(action_list, bill_id, title):
     def build_dict(item, closure):
         action_dict = action_for(item)
 
-        extra_action_info, new_status = parse_bill_action(
-            action_dict, closure['prev_status'], bill_id, title
-        )
+        extra_action_info, new_status = parse_bill_action(action_dict, closure['prev_status'], bill_id, title)
 
         # only change/reflect status change if there was one
         if new_status:
@@ -614,10 +597,7 @@ def action_for(item):
     action_dict = {
         'acted_at': acted_at,
         'action_code': item.get('actionCode', ''),
-        'committees': [
-            committee_item['systemCode'][0:-2].upper()
-            for committee_item in committee_nodes
-        ]
+        'committees': [committee_item['systemCode'][0:-2].upper() for committee_item in committee_nodes]
         if committee_nodes
         else None,  # if empty, store None
         'references': references,
@@ -672,13 +652,8 @@ def related_bills_for(related_bills_list):
     def build_dict(item):
 
         return {
-            'reason': item['relationshipDetails']['item'][0]['type']
-            .replace('bill', '')
-            .strip()
-            .lower(),
-            'bill_id': '{0}{1}-{2}'.format(
-                item['type'].replace('.', '').lower(), item['number'], item['congress']
-            ),
+            'reason': item['relationshipDetails']['item'][0]['type'].replace('bill', '').strip().lower(),
+            'bill_id': '{0}{1}-{2}'.format(item['type'].replace('.', '').lower(), item['number'], item['congress']),
             'type': 'bill',
             'identified_by': item['relationshipDetails']['item'][0]['identifiedBy'],
         }
@@ -755,11 +730,7 @@ def history_from_actions(actions):
 
     house_vote = None
     for action in actions:
-        if (
-            (action['type'] == 'vote')
-            and (action['where'] == 'h')
-            and (action['vote_type'] != "override")
-        ):
+        if (action['type'] == 'vote') and (action['where'] == 'h') and (action['vote_type'] != "override"):
             house_vote = action
     if house_vote:
         history['house_passage_result'] = house_vote['result']
@@ -767,11 +738,7 @@ def history_from_actions(actions):
 
     senate_vote = None
     for action in actions:
-        if (
-            (action['type'] == 'vote')
-            and (action['where'] == 's')
-            and (action['vote_type'] != "override")
-        ):
+        if (action['type'] == 'vote') and (action['where'] == 's') and (action['vote_type'] != "override"):
             senate_vote = action
     if senate_vote:
         history['senate_passage_result'] = senate_vote['result']
@@ -802,11 +769,7 @@ def history_from_actions(actions):
 
     house_override_vote = None
     for action in actions:
-        if (
-            (action['type'] == 'vote')
-            and (action['where'] == 'h')
-            and (action['vote_type'] == "override")
-        ):
+        if (action['type'] == 'vote') and (action['where'] == 'h') and (action['vote_type'] == "override"):
             house_override_vote = action
     if house_override_vote:
         history['house_override_result'] = house_override_vote['result']
@@ -814,11 +777,7 @@ def history_from_actions(actions):
 
     senate_override_vote = None
     for action in actions:
-        if (
-            (action['type'] == 'vote')
-            and (action['where'] == 's')
-            and (action['vote_type'] == "override")
-        ):
+        if (action['type'] == 'vote') and (action['where'] == 's') and (action['vote_type'] == "override"):
             senate_override_vote = action
     if senate_override_vote:
         history['senate_override_result'] = senate_override_vote['result']
@@ -1111,10 +1070,7 @@ def parse_bill_action(action_dict, prev_status, bill_id, title):
         elif False:
             vote_type = "vote2"
         else:
-            raise Exception(
-                "Need to classify %s as being in the originating chamber or not."
-                % prev_status
-            )
+            raise Exception("Need to classify %s as being in the originating chamber or not." % prev_status)
 
         roll = None
         m = re.search(r"\((Roll no\.|Record Vote No:) (\d+)\)", how, re.I)
@@ -1337,9 +1293,7 @@ def parse_bill_action(action_dict, prev_status, bill_id, title):
         action["committee"] = m.group(1)
         if prev_status in ("INTRODUCED", "REFERRED"):
             status = "REPORTED"
-    m = re.search(
-        r"Reported to Senate from the (.*?)( \(without written report\))?\.", line, re.I
-    )
+    m = re.search(r"Reported to Senate from the (.*?)( \(without written report\))?\.", line, re.I)
     if m is not None:  # 93rd Congress
         action["type"] = "reported"
         action["committee"] = m.group(1)
@@ -1437,9 +1391,7 @@ def parse_bill_action(action_dict, prev_status, bill_id, title):
     return action, status
 
 
-def new_status_after_vote(
-    vote_type, passed, chamber, bill_type, suspension, amended, title, prev_status
-):
+def new_status_after_vote(vote_type, passed, chamber, bill_type, suspension, amended, title, prev_status):
     if vote_type == "vote":  # vote in originating chamber
         if passed:
             if bill_type in ("hres", "sres"):
@@ -1472,9 +1424,7 @@ def new_status_after_vote(
                 ):
                     return 'PASSED:CONSTAMEND'  # joint resolution that looks like an amendment to the constitution
                 if bill_type in ("hconres", "sconres"):
-                    return (
-                        'PASSED:CONCURRENTRES'  # end of life for concurrent resolutions
-                    )
+                    return 'PASSED:CONCURRENTRES'  # end of life for concurrent resolutions
                 return 'PASSED:BILL'  # passed by second chamber, now on to president
         if vote_type == "pingpong":
             # chamber failed to accept the other chamber's changes, but it can vote again
@@ -1521,9 +1471,7 @@ def new_status_after_vote(
                 ):
                     return 'PASSED:CONSTAMEND'  # joint resolution that looks like an amendment to the constitution
                 if bill_type in ("hconres", "sconres"):
-                    return (
-                        'PASSED:CONCURRENTRES'  # end of life for concurrent resolutions
-                    )
+                    return 'PASSED:CONCURRENTRES'  # end of life for concurrent resolutions
                 return 'PASSED:BILL'
             else:
                 if chamber == "h":
@@ -1546,9 +1494,7 @@ def amendments_for(amendment_list):
             if type(item[attr]) is list:
                 item[attr] = item[attr][0]
         return {
-            'amendment_id': "{0}{1}-{2}".format(
-                item['type'].lower(), item['number'], item['congress']
-            ),
+            'amendment_id': "{0}{1}-{2}".format(item['type'].lower(), item['number'], item['congress']),
             'amendment_type': item['type'].lower(),
             'chamber': item['type'][0].lower(),
             'number': item['number'],

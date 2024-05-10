@@ -32,14 +32,10 @@ class CompressingTimedRotatingFileHandler(TimedRotatingFileHandler):
         archive_filename = Path(dest).name
         output_filepath = os.path.join(archives_folder, archive_filename)
 
-        CompressingTimedRotatingFileHandler.clean_up_archives_folder(
-            archives_folder, archive_filename
-        )
+        CompressingTimedRotatingFileHandler.clean_up_archives_folder(archives_folder, archive_filename)
 
         source = Path(source)
-        with source.open('rb') as f_in, gzip.open(
-            filename=output_filepath, mode='wb', compresslevel=9
-        ) as f_out:
+        with source.open('rb') as f_in, gzip.open(filename=output_filepath, mode='wb', compresslevel=9) as f_out:
             f_out.writelines(f_in)
         source.unlink()
 
@@ -50,32 +46,20 @@ class CompressingTimedRotatingFileHandler(TimedRotatingFileHandler):
         1.if total number of .gz files exceeds maximum allowed amount.
         2.if total size of .gz exceeds total maximum allowed files size.
         """
-        archive_base_name = CompressingTimedRotatingFileHandler.get_file_base_name(
-            archive_filename
-        )
+        archive_base_name = CompressingTimedRotatingFileHandler.get_file_base_name(archive_filename)
         if not archive_base_name:
             return
-        all_files = CompressingTimedRotatingFileHandler.get_folder_files(
-            archives_folder
-        )
+        all_files = CompressingTimedRotatingFileHandler.get_folder_files(archives_folder)
         if not all_files:
             return
-        full_name_regex = CongressConstants.LOG_FULL_FILE_NAME_REGEX.value.format(
-            base_name=archive_base_name
-        )
+        full_name_regex = CongressConstants.LOG_FULL_FILE_NAME_REGEX.value.format(base_name=archive_base_name)
         target_files = sorted(
-            [
-                file_path
-                for file_path in all_files
-                if re.findall(full_name_regex, file_path.name)
-            ],
+            [file_path for file_path in all_files if re.findall(full_name_regex, file_path.name)],
             key=os.path.getctime,
             reverse=True,
         )
         if CompressingTimedRotatingFileHandler.check_files_amount(target_files):
-            CompressingTimedRotatingFileHandler.remove_extra_files_by_amount(
-                target_files
-            )
+            CompressingTimedRotatingFileHandler.remove_extra_files_by_amount(target_files)
         if CompressingTimedRotatingFileHandler.check_files_size(target_files):
             CompressingTimedRotatingFileHandler.remove_last_file(target_files)
 

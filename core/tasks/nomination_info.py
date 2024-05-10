@@ -101,9 +101,7 @@ def parse_nomination(nomination_id, body, options):
 
                 # use 'acted_at', even though it's always a date, to be consistent
                 # with acted_at field on bills and amendments
-                acted_at = datetime.strptime(pieces[0], "%B %d, %Y").strftime(
-                    "%Y-%m-%d"
-                )
+                acted_at = datetime.strptime(pieces[0], "%B %d, %Y").strftime("%Y-%m-%d")
 
                 # join rest back together (in case action itself has a hyphen)
                 text = str.join(" - ", pieces[1 : len(pieces)])
@@ -143,14 +141,10 @@ def parse_nomination(nomination_id, body, options):
                     if match:
                         info["congress"] = int(match.group(1))
                     else:
-                        raise Exception(
-                            "Choked, couldn't find Congress in \"%s\"" % data
-                        )
+                        raise Exception("Choked, couldn't find Congress in \"%s\"" % data)
 
                     # Doc format is: "January 04, 1995 (104th Congress)"
-                    info["received_on"] = datetime.strptime(
-                        data.split(" (")[0], "%B %d, %Y"
-                    ).strftime("%Y-%m-%d")
+                    info["received_on"] = datetime.strptime(data.split(" (")[0], "%B %d, %Y").strftime("%Y-%m-%d")
 
                 elif label == "Nominee":
 
@@ -173,9 +167,7 @@ def parse_nomination(nomination_id, body, options):
                     else:
                         raise Exception("Couldn't find the position in the comments.")
 
-                    info["nominees"] = [
-                        {"name": name, "position": position, "state": facts[-6][2:]}
-                    ]
+                    info["nominees"] = [{"name": name, "position": position, "state": facts[-6][2:]}]
 
                 elif label.lower() == "nominees":
                     pass

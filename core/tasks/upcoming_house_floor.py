@@ -46,24 +46,18 @@ def run(options):
 
 
 def run_for_week(for_the_week, options):
-    logging.info(
-        'Scraping upcoming bills from docs.house.gov/floor for the week of %s...'
-        % for_the_week
-    )
+    logging.info('Scraping upcoming bills from docs.house.gov/floor for the week of %s...' % for_the_week)
     house_floor = fetch_floor_week(for_the_week, options)
     if house_floor is None:
         logging.warn("Nothing posted for the week of %s" % for_the_week)
         return
 
     output_file = "%s/upcoming_house_floor/%s.json" % (utils.data_dir(), for_the_week)
-    output = json.dumps(
-        house_floor, sort_keys=True, indent=2, default=utils.format_datetime
-    )
+    output = json.dumps(house_floor, sort_keys=True, indent=2, default=utils.format_datetime)
     utils.write(output, output_file)
 
     logging.warn(
-        "Found %i bills for the week of %s, written to %s"
-        % (len(house_floor['upcoming']), for_the_week, output_file)
+        "Found %i bills for the week of %s, written to %s" % (len(house_floor['upcoming']), for_the_week, output_file)
     )
 
 
@@ -79,9 +73,7 @@ def fetch_floor_week(for_the_week, options):
     if "force" not in options2:
         options2["force"] = True
 
-    body = utils.download(
-        week_url, 'upcoming_house_floor/%s.xml' % for_the_week, options2
-    )
+    body = utils.download(week_url, 'upcoming_house_floor/%s.xml' % for_the_week, options2)
     if "was not found" in body:
         return None
     dom = lxml.etree.fromstring(body)
@@ -93,9 +85,7 @@ def fetch_floor_week(for_the_week, options):
     congress = int(dom.xpath('//floorschedule')[0].get('congress-num'))
 
     # week of this day, e.g. '2013-01-21'
-    legislative_day = (
-        for_the_week[0:4] + '-' + for_the_week[4:6] + '-' + for_the_week[6:]
-    )
+    legislative_day = for_the_week[0:4] + '-' + for_the_week[4:6] + '-' + for_the_week[6:]
 
     upcoming = []
 
@@ -155,9 +145,7 @@ def fetch_floor_week(for_the_week, options):
 
             elif re.match("Conference report to accompany ", bill_number, re.I):
                 bill['item_type'] = 'conference_report'
-                bill_number = bill_number.lower().replace(
-                    "conference report to accompany ", ''
-                )
+                bill_number = bill_number.lower().replace("conference report to accompany ", '')
             else:
                 bill['item_type'] = 'bill'
 
@@ -177,9 +165,7 @@ def fetch_floor_week(for_the_week, options):
             filename = file_url.split('/')[-1]
             file_format = file.get('doc-type').lower()
 
-            logging.warn(
-                "\t%s file for %s: %s" % (file_format.upper(), bill_number, filename)
-            )
+            logging.warn("\t%s file for %s: %s" % (file_format.upper(), bill_number, filename))
 
             file_field = {
                 'url': file_url,
@@ -196,17 +182,13 @@ def fetch_floor_week(for_the_week, options):
             try:
                 file_path = 'upcoming_house_floor/%s/%s' % (for_the_week, filename)
                 try:
-                    os.makedirs(
-                        os.path.join(utils.data_dir(), os.path.dirname(file_path))
-                    )
+                    os.makedirs(os.path.join(utils.data_dir(), os.path.dirname(file_path)))
                 except OSError:
                     pass  # directory exists
                 options3 = dict(options)
                 options3["to_cache"] = False  # put in the actual specified directory
                 options3["binary"] = True  # force binary mode, no file escaping
-                utils.download(
-                    file_url, os.path.join(utils.data_dir(), file_path), options3
-                )
+                utils.download(file_url, os.path.join(utils.data_dir(), file_path), options3)
                 file_field['path'] = file_path
             except IOError:
                 logging.error(
@@ -267,15 +249,11 @@ def fetch_floor_week(for_the_week, options):
                 is_data_dot=False,
             )
             try:
-                os.makedirs(
-                    os.path.join(utils.data_dir(), os.path.dirname(text_data_path))
-                )
+                os.makedirs(os.path.join(utils.data_dir(), os.path.dirname(text_data_path)))
             except OSError:
                 pass  # directory exists
             utils.write(
-                json.dumps(
-                    bill, sort_keys=True, indent=2, default=utils.format_datetime
-                ),
+                json.dumps(bill, sort_keys=True, indent=2, default=utils.format_datetime),
                 text_data_path,
             )
 
@@ -305,9 +283,7 @@ def get_latest_monday(options):
 
     links = doc.select("a.downloadXML")
     if len(links) != 1:
-        utils.admin(
-            "There is no docs.house.gov download link --- maybe there are no upcoming bills."
-        )
+        utils.admin("There is no docs.house.gov download link --- maybe there are no upcoming bills.")
         return None
 
     link = links[0]
@@ -326,9 +302,7 @@ def get_mondays_to_scan(options):
 
     # Look two weeks into the future too, since when we get to the end of the week the next
     # week's list is sometimes available, and sometimes a week beyond that.
-    return [
-        (most_recent + relativedelta(days=7 * i)).strftime("%Y%m%d") for i in [0, 1, 2]
-    ]
+    return [(most_recent + relativedelta(days=7 * i)).strftime("%Y%m%d") for i in [0, 1, 2]]
 
 
 def bill_id_for(bill_number, congress):

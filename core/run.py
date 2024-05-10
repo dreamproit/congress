@@ -70,11 +70,7 @@ def main():
                 )
                 sys.exit(1)
             elif not callable(patch_func):
-                logger.error(
-                    "You specified a --patch argument but {}.patch is not callable".format(
-                        options['patch']
-                    )
-                )
+                logger.error("You specified a --patch argument but {}.patch is not callable".format(options['patch']))
                 sys.exit(1)
             else:
                 patch_mod.patch(task_name)

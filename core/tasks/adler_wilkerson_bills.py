@@ -106,9 +106,7 @@ def process_bill(record):
         # special fields
         'by_request': binary(record['ByReq']),
         'commemerative': binary(record['Commem']),
-        'num_cosponsors': int(record['Cosponsr'])
-        if record['Cosponsr'] != 'NULL'
-        else None,
+        'num_cosponsors': int(record['Cosponsr']) if record['Cosponsr'] != 'NULL' else None,
         'private': binary(record['Private']),
         # meta-metadata
         'updated_at': datetime.datetime.now(),

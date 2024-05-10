@@ -18,18 +18,14 @@ def run(options):
             if options.get("fast", False):
                 logging.warn("No nominations changed.")
             else:
-                logging.error(
-                    "Error figuring out which nominations to download, aborting."
-                )
+                logging.error("Error figuring out which nominations to download, aborting.")
             return None
 
         limit = options.get('limit', None)
         if limit:
             to_fetch = to_fetch[: int(limit)]
 
-    logging.warn(
-        "Going to fetch %i nominations from congress #%s" % (len(to_fetch), congress)
-    )
+    logging.warn("Going to fetch %i nominations from congress #%s" % (len(to_fetch), congress))
 
     utils.process_set(to_fetch, nomination_info.fetch_nomination, options)
 

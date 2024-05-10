@@ -130,9 +130,7 @@ def get_term_congresses(term):
 
     end_congress_last_year = end_congress_years[2]
 
-    valid_congresses = (start_year >= start_congress_first_year) and (
-        end_year <= end_congress_last_year
-    )
+    valid_congresses = (start_year >= start_congress_first_year) and (end_year <= end_congress_last_year)
 
     return congresses if valid_congresses else []
 
@@ -237,9 +235,7 @@ _download_zip_files = {}
 
 def download(url, destination=None, options={}):
     scraper = scrapelib.Scraper(requests_per_minute=120, retry_attempts=3)
-    scraper.user_agent = (
-        "unitedstates/congress (https://github.com/unitedstates/congress)"
-    )
+    scraper.user_agent = "unitedstates/congress (https://github.com/unitedstates/congress)"
     # uses cache by default, override (True) to ignore
     force = options.get('force', False)
 
@@ -255,12 +251,8 @@ def download(url, destination=None, options={}):
     # if need a POST request with data
     postdata = options.get('postdata', False)
 
-    timeout = float(
-        options.get('timeout', 30)
-    )  # The low level socket api requires a float
-    allowRedirects = float(
-        options.get('allow_redirects', True)
-    )  # Follow redirects i.g. http -> https
+    timeout = float(options.get('timeout', 30))  # The low level socket api requires a float
+    allowRedirects = float(options.get('allow_redirects', True))  # Follow redirects i.g. http -> https
     urlopen_kwargs = {'timeout': timeout, 'allow_redirects': allowRedirects}
 
     # caller cares about actually bytes or only success/fail
@@ -311,9 +303,7 @@ def download(url, destination=None, options={}):
             if not test:
                 logger.info("Cached: (%s, %s)" % (zfn + "#" + zfn_inner, url))
             if force:
-                raise Exception(
-                    "Cannot re-download a file already cached to a ZIP file."
-                )
+                raise Exception("Cannot re-download a file already cached to a ZIP file.")
 
             if not is_binary:
                 body = body.decode("utf8")
@@ -346,9 +336,7 @@ def download(url, destination=None, options={}):
                     mkdir_p(os.path.dirname(cache_path))
                     scraper.urlretrieve(url, cache_path, **urlopen_kwargs)
                     return True
-                logger.info(
-                    f'Making a GET request to the url: "{url}", params: {urlopen_kwargs}.'
-                )
+                logger.info(f'Making a GET request to the url: "{url}", params: {urlopen_kwargs}.')
                 response = scraper.get(url, **urlopen_kwargs)
 
             if not is_binary:
@@ -432,16 +420,12 @@ def show_diff_ask_ok(source, revised, fn):
     from difflib import unified_diff
     import sys
 
-    sys.stdout.writelines(
-        unified_diff(split_lines(source), split_lines(revised), fromfile=fn, tofile=fn)
-    )
+    sys.stdout.writelines(unified_diff(split_lines(source), split_lines(revised), fromfile=fn, tofile=fn))
     return input("Apply change? (y/n) ").strip() == "y"
 
 
 def write_json(data, destination):
-    return write(
-        json.dumps(data, sort_keys=True, indent=2, default=format_datetime), destination
-    )
+    return write(json.dumps(data, sort_keys=True, indent=2, default=format_datetime), destination)
 
 
 def read(destination):
@@ -523,9 +507,7 @@ def unescape(text):
 def extract_bills(text, session):
     bill_ids = []
 
-    p = re.compile(
-        r'((S\.|H\.)(\s?J\.|\s?R\.|\s?Con\.| ?)(\s?Res\.)*\s?\d+)', flags=re.IGNORECASE
-    )
+    p = re.compile(r'((S\.|H\.)(\s?J\.|\s?R\.|\s?Con\.| ?)(\s?Res\.)*\s?\d+)', flags=re.IGNORECASE)
     bill_matches = p.findall(text)
 
     if bill_matches:
@@ -688,10 +670,7 @@ def get_cache_filename(filename):
 
 
 def check_cached_file(filename, cache_filename):
-    return (
-        os.path.exists(cache_filename)
-        and os.stat(cache_filename).st_mtime > os.stat(filename).st_mtime
-    )
+    return os.path.exists(cache_filename) and os.stat(cache_filename).st_mtime > os.stat(filename).st_mtime
 
 
 # Problem with finding a cache entry.
@@ -708,9 +687,7 @@ def cache_load(cache_filename, file_hash):
     try:
         cache_data = pickle_load(cache_filename)
     except IOError:
-        raise CacheError(
-            "Could not retrieve potential cache file: %s" % (cache_filename)
-        )
+        raise CacheError("Could not retrieve potential cache file: %s" % (cache_filename))
 
     # A cache file has a specific structure.
     if "hash" not in cache_data or "data" not in cache_data:
@@ -718,9 +695,7 @@ def cache_load(cache_filename, file_hash):
 
     # If the hashes don't match, we've retrieved the cache for something else.
     if cache_data["hash"] != file_hash:
-        raise CacheError(
-            "Hashes do not match: %s, %s" % (file_hash, cache_data["hash"])
-        )
+        raise CacheError("Hashes do not match: %s, %s" % (file_hash, cache_data["hash"]))
 
     return cache_data["data"]
 
@@ -773,17 +748,13 @@ def require_congress_legislators_repo():
     # Clone the congress-legislators repo if we don't have it.
     if not os.path.exists("congress-legislators"):
         logger.warn("Cloning the congress-legislators repo...")
-        os.system(
-            "git clone -q --depth 1 https://github.com/unitedstates/congress-legislators congress-legislators"
-        )
+        os.system("git clone -q --depth 1 https://github.com/unitedstates/congress-legislators congress-legislators")
 
     if os.environ.get("UPDATE_CONGRESS_LEGISLATORS") != "NO":
         # Update the repo so we have the latest.
         logger.warn("Updating the congress-legislators repo...")
         # these two == git pull, but git pull ignores -q on the merge part so is less quiet
-        os.system(
-            "cd congress-legislators; git fetch -pq; git merge --ff-only -q origin/main"
-        )
+        os.system("cd congress-legislators; git fetch -pq; git merge --ff-only -q origin/main")
 
     # We now have the congress-legislators repo.
     has_congress_legislators_repo = True
@@ -792,9 +763,7 @@ def require_congress_legislators_repo():
 lookup_legislator_cache = []
 
 
-def lookup_legislator(
-    congress, role_type, name, state, party, when, id_requested, exclude=set()
-):
+def lookup_legislator(congress, role_type, name, state, party, when, id_requested, exclude=set()):
     # This is a basic lookup function given the legislator's name, state, party,
     # and the date of the vote.
 
@@ -803,9 +772,7 @@ def lookup_legislator(
     global lookup_legislator_cache
     if not lookup_legislator_cache:
         require_congress_legislators_repo()
-        lookup_legislator_cache = (
-            {}
-        )  # from Congress number to list of (moc,term) tuples that might be in that Congress
+        lookup_legislator_cache = {}  # from Congress number to list of (moc,term) tuples that might be in that Congress
         for filename in ("legislators-historical", "legislators-current"):
             for moc in yaml_load("congress-legislators/%s.yaml" % (filename)):
                 for term in moc["terms"]:
@@ -821,11 +788,7 @@ def lookup_legislator(
             return name
         import unicodedata
 
-        return "".join(
-            c
-            for c in unicodedata.normalize('NFKD', name)
-            if not unicodedata.combining(c)
-        )
+        return "".join(c for c in unicodedata.normalize('NFKD', name) if not unicodedata.combining(c))
 
     # Scan all of the terms that cover 'when' for a match.
     if isinstance(when, datetime.datetime):
@@ -877,9 +840,9 @@ def lookup_legislator(
             name_info.update(name_info_rec)  # override with the other_name information
 
             # check last name
-            if name_parts[0] != to_ascii(name_info['last']) and name_parts[
-                0
-            ] not in to_ascii(name_info['last']).split(" "):
+            if name_parts[0] != to_ascii(name_info['last']) and name_parts[0] not in to_ascii(name_info['last']).split(
+                " "
+            ):
                 continue  # no match
 
             # Compare the first name. Allow it to match either the first or middle name,
@@ -909,10 +872,7 @@ def lookup_legislator(
 
     # Return if there is a unique match.
     if len(matches) == 0:
-        logger.warn(
-            "Could not match name %s (%s-%s; %s) to any legislator."
-            % (name, state, party, when)
-        )
+        logger.warn("Could not match name %s (%s-%s; %s) to any legislator." % (name, state, party, when))
         return None
     if len(matches) > 1:
         logger.warn(
@@ -925,9 +885,7 @@ def lookup_legislator(
 
 class UnmatchedIdentifer(Exception):
     def __init__(self, id_type, id_value, desired_id_type):
-        super(UnmatchedIdentifer, self).__init__(
-            "%s=%s => %s" % (id_type, str(id_value), desired_id_type)
-        )
+        super(UnmatchedIdentifer, self).__init__("%s=%s => %s" % (id_type, str(id_value), desired_id_type))
 
 
 _translate_legislator_id_cache = None
@@ -973,9 +931,7 @@ class NoInterrupt(object):
         self.old_handlers = {}
         for sig in self.sigs:
 
-            def handler(
-                s, frame, sig=sig
-            ):  # sig=sig ensures the variable is captured by value
+            def handler(s, frame, sig=sig):  # sig=sig ensures the variable is captured by value
                 self.signal_received[sig] = (s, frame)
                 # Note: in Python 3.5, you can use signal.Signals(sig).name
                 logger.info('Signal %s received. Delaying KeyboardInterrupt.' % sig)

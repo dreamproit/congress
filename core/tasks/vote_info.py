@@ -14,9 +14,7 @@ from core.tasks import utils
 def fetch_vote(vote_id, options):
     logging.info("\n[%s] Fetching..." % vote_id)
 
-    vote_chamber, vote_number, vote_congress, vote_session_year = utils.split_vote_id(
-        vote_id
-    )
+    vote_chamber, vote_number, vote_congress, vote_session_year = utils.split_vote_id(vote_id)
 
     if vote_chamber == "h":
         url = "https://clerk.house.gov/evs/%s/roll%03d.xml" % (
@@ -24,20 +22,13 @@ def fetch_vote(vote_id, options):
             int(vote_number),
         )
     else:
-        session_num = (
-            int(vote_session_year)
-            - utils.get_congress_first_year(int(vote_congress))
-            + 1
-        )
-        url = (
-            "https://www.senate.gov/legislative/LIS/roll_call_votes/vote%d%d/vote_%d_%d_%05d.xml"
-            % (
-                int(vote_congress),
-                session_num,
-                int(vote_congress),
-                session_num,
-                int(vote_number),
-            )
+        session_num = int(vote_session_year) - utils.get_congress_first_year(int(vote_congress)) + 1
+        url = "https://www.senate.gov/legislative/LIS/roll_call_votes/vote%d%d/vote_%d_%d_%05d.xml" % (
+            int(vote_congress),
+            session_num,
+            int(vote_congress),
+            session_num,
+            int(vote_number),
         )
 
     # fetch vote XML page
@@ -198,9 +189,7 @@ def output_vote(vote, options, id_type=None):
     )
     options_list = sorted(
         vote["votes"].keys(),
-        key=lambda o: option_sort_order.index(o)
-        if o in option_sort_order
-        else option_sort_order.index("OTHER"),
+        key=lambda o: option_sort_order.index(o) if o in option_sort_order else option_sort_order.index("OTHER"),
     )
     for option in options_list:
         if option not in option_keys:
@@ -213,11 +202,7 @@ def output_vote(vote, options, id_type=None):
             # where the clerk calls a quorum roll call. But because Letlow had died prior to this date,
             # he is not represented in congress-legislators and has no GovTrack-id, and so we cannot
             # represent this record in the data.
-            if (
-                isinstance(v, dict)
-                and v["id"] == "L000555"
-                and options.get("govtrack", False)
-            ):
+            if isinstance(v, dict) and v["id"] == "L000555" and options.get("govtrack", False):
                 continue
 
             n = utils.make_node(root, "voter", None)
@@ -248,9 +233,7 @@ def output_vote(vote, options, id_type=None):
 
 
 def output_for_vote(vote_id, format):
-    vote_chamber, vote_number, vote_congress, vote_session_year = utils.split_vote_id(
-        vote_id
-    )
+    vote_chamber, vote_number, vote_congress, vote_session_year = utils.split_vote_id(vote_id)
     return "%s/%s/votes/%s/%s%s/%s" % (
         utils.data_dir(),
         vote_congress,
@@ -345,9 +328,7 @@ def parse_senate_vote(dom, vote):
             pass
 
     if str(dom.xpath("string(amendment/amendment_number)")):
-        m = re.match(
-            r"^S.Amdt. (\d+)", str(dom.xpath("string(amendment/amendment_number)"))
-        )
+        m = re.match(r"^S.Amdt. (\d+)", str(dom.xpath("string(amendment/amendment_number)")))
         if m:
             vote["amendment"] = {
                 "type": "s",
@@ -368,17 +349,13 @@ def parse_senate_vote(dom, vote):
                 "congress": vote["congress"],
                 "type": bill_types[bill_type],
                 "number": int(bill_number),
-                "title": str(
-                    dom.xpath("string(amendment/amendment_to_document_short_title)")
-                ),
+                "title": str(dom.xpath("string(amendment/amendment_to_document_short_title)")),
             }
         else:
             # Senate votes:
             # 102nd Congress, 2nd session (1992): 247, 248, 250; 105th Congress, 2nd session (1998): 106 through 116;
             # 108th Congress, 1st session (2003): 41, 42
-            logging.warn(
-                "Amendment without corresponding bill info in %s " % vote["vote_id"]
-            )
+            logging.warn("Amendment without corresponding bill info in %s " % vote["vote_id"])
 
     # Count up the votes.
     vote["votes"] = {}
@@ -401,12 +378,10 @@ def parse_senate_vote(dom, vote):
             )
             if voter["id"] is None:
                 logging.error(
-                    "[%s] Missing lis_member_id and name lookup failed for %s"
-                    % (vote["vote_id"], voter["last_name"])
+                    "[%s] Missing lis_member_id and name lookup failed for %s" % (vote["vote_id"], voter["last_name"])
                 )
                 raise Exception(
-                    "Could not find ID for %s (%s-%s)"
-                    % (voter["last_name"], voter["state"], voter["party"])
+                    "Could not find ID for %s (%s-%s)" % (voter["last_name"], voter["state"], voter["party"])
                 )
             else:
                 logging.info(
@@ -452,9 +427,7 @@ def parse_house_vote(dom, vote):
             return datetime.datetime.strptime(d, "%d-%b-%Y")
 
     vote["date"] = parse_date(
-        str(dom.xpath("string(vote-metadata/action-date)"))
-        + " "
-        + str(dom.xpath("string(vote-metadata/action-time)"))
+        str(dom.xpath("string(vote-metadata/action-date)")) + " " + str(dom.xpath("string(vote-metadata/action-time)"))
     )
     vote["question"] = str(dom.xpath("string(vote-metadata/vote-question)"))
     vote["type"] = str(dom.xpath("string(vote-metadata/vote-question)"))
@@ -478,17 +451,13 @@ def parse_house_vote(dom, vote):
         "2/3 RECORDED VOTE": "2/3",
         "3/5 RECORDED VOTE": "3/5",
     }
-    vote["requires"] = vote_types.get(
-        str(dom.xpath("string(vote-metadata/vote-type)")), "unknown"
-    )
+    vote["requires"] = vote_types.get(str(dom.xpath("string(vote-metadata/vote-type)")), "unknown")
 
     vote["result_text"] = str(dom.xpath("string(vote-metadata/vote-result)"))
     vote["result"] = str(dom.xpath("string(vote-metadata/vote-result)"))
 
     bill_num = str(dom.xpath("string(vote-metadata/legis-num)"))
-    if bill_num not in ("", "QUORUM", "JOURNAL", "MOTION", "ADJOURN") and not re.match(
-        r"QUORUM \d+$", bill_num
-    ):
+    if bill_num not in ("", "QUORUM", "JOURNAL", "MOTION", "ADJOURN") and not re.match(r"QUORUM \d+$", bill_num):
         bill_types = {
             "S": "s",
             "S CON RES": "sconres",
@@ -523,9 +492,7 @@ def parse_house_vote(dom, vote):
             str(dom.xpath("string(vote-metadata/legis-num)")),
         )
     elif "amendment" in vote:
-        vote["question"] += (
-            ": Amendment %s to [unknown bill]" % vote["amendment"]["number"]
-        )
+        vote["question"] += ": Amendment %s to [unknown bill]" % vote["amendment"]["number"]
     elif "bill" in vote:
         vote["question"] += ": " + str(dom.xpath("string(vote-metadata/legis-num)"))
         if "subject" in vote:
@@ -540,10 +507,7 @@ def parse_house_vote(dom, vote):
         vote["votes"].setdefault(vote_option, []).append(voter)
 
     # Ensure the options are noted, even if no one votes that way.
-    if (
-        str(dom.xpath("string(vote-metadata/vote-question)"))
-        == "Election of the Speaker"
-    ):
+    if str(dom.xpath("string(vote-metadata/vote-question)")) == "Election of the Speaker":
         for n in dom.xpath('vote-metadata/vote-totals/totals-by-candidate/candidate'):
             vote["votes"][n.text] = []
     elif str(dom.xpath("string(vote-metadata/vote-question)")) == "Call of the House":
@@ -591,9 +555,7 @@ def parse_house_vote(dom, vote):
 
     seen_ids = set()
     all_voters = sum(vote["votes"].values(), [])
-    all_voters.sort(
-        key=lambda v: len(v["display_name"]), reverse=True
-    )  # process longer names first
+    all_voters.sort(key=lambda v: len(v["display_name"]), reverse=True)  # process longer names first
     for v in all_voters:
         if v["id"] not in ("", "0000000"):
             continue
@@ -616,11 +578,7 @@ def parse_house_vote(dom, vote):
             continue
 
         # dead man recorded as Not Voting (he died the day before, so none of our roles match the vote date)
-        if (
-            vote["vote_id"] == "h306-106.1999"
-            and display_name == "Brown"
-            and v["state"] == "CA"
-        ):
+        if vote["vote_id"] == "h306-106.1999" and display_name == "Brown" and v["state"] == "CA":
             v["id"] = "B000918"
             continue
 
@@ -641,9 +599,7 @@ def parse_house_vote(dom, vote):
                 "[%s] Missing bioguide ID and name lookup failed for %s (%s-%s on %s)"
                 % (vote["vote_id"], display_name, v["state"], v["party"], vote["date"])
             )
-            raise Exception(
-                "No bioguide ID for %s (%s-%s)" % (display_name, v["state"], v["party"])
-            )
+            raise Exception("No bioguide ID for %s (%s-%s)" % (display_name, v["state"], v["party"]))
         else:
             if vote["congress"] > 107:
                 logging.warn(
@@ -701,9 +657,7 @@ def normalize_vote_type(vote_type):
         if m:
             if m.groups():
                 for i, val in enumerate(m.groups()):
-                    replacement = replacement.replace(
-                        "$%d" % (i + 1), val if val else ""
-                    )
+                    replacement = replacement.replace("$%d" % (i + 1), val if val else "")
             return replacement
 
     return vote_type

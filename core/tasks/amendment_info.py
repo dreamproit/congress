@@ -16,9 +16,7 @@ def process_amendment(amdt_data, bill_id, options):
     logging.info("[%s] Saving %s to %s..." % (bill_id, amdt['amendment_id'], path))
 
     # output JSON - so easy!
-    utils.write(
-        json.dumps(amdt, sort_keys=True, indent=2, default=utils.format_datetime), path
-    )
+    utils.write(json.dumps(amdt, sort_keys=True, indent=2, default=utils.format_datetime), path)
 
     with open(output_for_amdt(amdt['amendment_id'], "xml"), 'wb') as xml_file:
         xml_file.write(create_govtrack_xml(amdt, options))
@@ -31,15 +29,13 @@ def build_amendment_json_dict(amdt_dict, options):
     # samdt4904-111 - amendment to treaty
     # samdt4922-111 - amendment to amendment to treaty
 
-    amendment_id = build_amendment_id(
-        amdt_dict['type'].lower(), amdt_dict['number'], amdt_dict['congress']
-    )
+    amendment_id = build_amendment_id(amdt_dict['type'].lower(), amdt_dict['number'], amdt_dict['congress'])
 
     amends_bill = amends_bill_for(amdt_dict.get('amendedBill'))  # almost always present
-    amends_treaty = None  # amends_treaty_for(amdt_dict) # the bulk data does not provide amendments to treaties (THOMAS did) # noqa
-    amends_amendment = amends_amendment_for(
-        amdt_dict.get('amendedAmendment')
-    )  # sometimes present
+    amends_treaty = (
+        None  # amends_treaty_for(amdt_dict) # the bulk data does not provide amendments to treaties (THOMAS did) # noqa
+    )
+    amends_amendment = amends_amendment_for(amdt_dict.get('amendedAmendment'))  # sometimes present
     if not amends_bill and not amends_treaty:
         raise Exception("Choked finding out what bill or treaty the amendment amends.")
 
@@ -54,17 +50,11 @@ def build_amendment_json_dict(amdt_dict, options):
         'amends_bill': amends_bill,
         'amends_treaty': amends_treaty,
         'amends_amendment': amends_amendment,
-        'sponsor': sponsor_for(
-            amdt_dict['sponsors']['item'][0], amdt_dict['type'].lower()
-        ),
-        'purpose': amdt_dict['purpose'][0]
-        if type(amdt_dict.get('purpose')) is list
-        else amdt_dict.get('purpose'),
+        'sponsor': sponsor_for(amdt_dict['sponsors']['item'][0], amdt_dict['type'].lower()),
+        'purpose': amdt_dict['purpose'][0] if type(amdt_dict.get('purpose')) is list else amdt_dict.get('purpose'),
         'introduced_at': amdt_dict['submittedDate'][:10],
         'actions': actions,
-        'updated_at': amdt_dict['updateDate'][0]
-        if type(amdt_dict['updateDate']) is list
-        else amdt_dict['updateDate'],
+        'updated_at': amdt_dict['updateDate'][0] if type(amdt_dict['updateDate']) is list else amdt_dict['updateDate'],
     }
 
     # duplicate attributes creates lists when parsed, this block deduplicates
@@ -108,9 +98,7 @@ def create_govtrack_xml(amdt, options):
             None,
             type=govtrack_type_codes[amdt["amends_bill"]["bill_type"]],
             number=str(amdt["amends_bill"]["number"]),
-            sequence=str(amdt["house_number"])
-            if amdt.get("house_number", None)
-            else "",
+            sequence=str(amdt["house_number"]) if amdt.get("house_number", None) else "",
         )
     elif amdt.get("amends_treaty", None):
         make_node(
@@ -175,9 +163,7 @@ def build_amendment_id(amdt_type, amdt_number, congress):
 def amends_bill_for(amends_bill):
     from core.tasks.bills import build_bill_id
 
-    bill_id = build_bill_id(
-        amends_bill['type'].lower(), amends_bill['number'], amends_bill['congress']
-    )
+    bill_id = build_bill_id(amends_bill['type'].lower(), amends_bill['number'], amends_bill['congress'])
     return {
         'bill_id': bill_id,
         'bill_type': amends_bill['type'].lower(),
@@ -190,9 +176,7 @@ def amends_amendment_for(amends_amdt):
     if amends_amdt is None:
         return None
 
-    amdt_id = build_amendment_id(
-        amends_amdt['type'].lower(), amends_amdt['number'], amends_amdt['congress']
-    )
+    amdt_id = build_amendment_id(amends_amdt['type'].lower(), amends_amdt['number'], amends_amdt['congress'])
     return {
         'amendment_id': amdt_id,
         'amendment_type': amends_amdt.get('type', '').lower(),
@@ -245,9 +229,7 @@ def parse_amendment_actions(actions):
 
             if m.group(3) == "agreed to":
                 action["result"] = "pass"
-                if m.group(
-                    1
-                ):  # is a motion to table, so result is sort of reversed.... eeek
+                if m.group(1):  # is a motion to table, so result is sort of reversed.... eeek
                     action["result"] = "fail"
             else:
                 if m.group(

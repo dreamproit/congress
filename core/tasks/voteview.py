@@ -28,11 +28,7 @@ def run(options):
     # we're going to need to map votes to sessions because in modern history the numbering resets by session
     session_dates = list(
         csv.DictReader(
-            io.StringIO(
-                utils.download("http://www.govtrack.us/data/us/sessions.tsv").encode(
-                    "utf8"
-                )
-            ),
+            io.StringIO(utils.download("http://www.govtrack.us/data/us/sessions.tsv").encode("utf8")),
             delimiter="\t",
         )
     )
@@ -41,9 +37,7 @@ def run(options):
     if chamber and chamber in ["h", "s"]:
         votes = get_votes(chamber, congress, options, session_dates)
     else:
-        votes = get_votes("h", congress, options, session_dates) + get_votes(
-            "s", congress, options, session_dates
-        )
+        votes = get_votes("h", congress, options, session_dates) + get_votes("s", congress, options, session_dates)
 
     utils.process_set(votes, put_vote, options)
 
@@ -60,14 +54,10 @@ def vote_list_source_urls_for(congress, chamber, options):
     def match(pattern):
         matches = re.findall(pattern, index_page, re.I)
         if len(matches) != 1:
-            raise ValueError(
-                "Index page %s did not match one value for pattern %s." % (url, pattern)
-            )
+            raise ValueError("Index page %s did not match one value for pattern %s." % (url, pattern))
         return matches[0]
 
-    return match(r"ftp://voteview.com/[^\.\s]+\.ord"), match(
-        r"ftp://voteview.com/dtl/[^\.\s]+\.dtl"
-    )
+    return match(r"ftp://voteview.com/[^\.\s]+\.ord"), match(r"ftp://voteview.com/dtl/[^\.\s]+\.dtl")
 
 
 def cache_file_for(congress, chamber, file_type):
@@ -271,15 +261,11 @@ def parse_vote_list_line(vote_list_line):
 
 
 def parse_rollcall_dtl_list_line(rollcall_list_line):
-    return re.match(
-        r"^([\s\d]{3}\d)([\s\d]{4}\d)?([\s\d]\d)\s(.*?)\s*$", rollcall_list_line
-    ).groups()
+    return re.match(r"^([\s\d]{3}\d)([\s\d]{4}\d)?([\s\d]\d)\s(.*?)\s*$", rollcall_list_line).groups()
 
 
 def parse_rollcall_dtl_list_first_line(rollcall_dtl_first_line):
-    return re.match(
-        r"^(.{14})(.{15})(.{10})?(.+?)(?:\s{3,}\d{2,3})?$", rollcall_dtl_first_line
-    ).groups()
+    return re.match(r"^(.{14})(.{15})(.{10})?(.+?)(?:\s{3,}\d{2,3})?$", rollcall_dtl_first_line).groups()
 
 
 def parse_rollcall_dtl_date(rollcall_dtl_date):
@@ -319,29 +305,15 @@ def parse_rollcall_dtl_date(rollcall_dtl_date):
 
 def extract_vote_info_from_parsed_vote_list_line(parsed_vote_list_line):
     vote_info = {
-        "congress": int(parsed_vote_list_line[0])
-        if parsed_vote_list_line[0].strip()
-        else None,
-        "icpsr_id": int(parsed_vote_list_line[1])
-        if parsed_vote_list_line[1].strip()
-        else None,
-        "icpsr_state": int(parsed_vote_list_line[2])
-        if parsed_vote_list_line[2].strip()
-        else None,
-        "district": int(parsed_vote_list_line[3])
-        if parsed_vote_list_line[3].strip()
-        else None,
+        "congress": int(parsed_vote_list_line[0]) if parsed_vote_list_line[0].strip() else None,
+        "icpsr_id": int(parsed_vote_list_line[1]) if parsed_vote_list_line[1].strip() else None,
+        "icpsr_state": int(parsed_vote_list_line[2]) if parsed_vote_list_line[2].strip() else None,
+        "district": int(parsed_vote_list_line[3]) if parsed_vote_list_line[3].strip() else None,
         # parsed_vote_list_line[4] is partial state name
         "state_name": parsed_vote_list_line[4].strip(),
-        "icpsr_party": int(parsed_vote_list_line[5])
-        if parsed_vote_list_line[5].strip()
-        else None,
-        "occupancy": int(parsed_vote_list_line[6])
-        if parsed_vote_list_line[6].strip()
-        else None,
-        "means": int(parsed_vote_list_line[7])
-        if parsed_vote_list_line[7].strip()
-        else None,
+        "icpsr_party": int(parsed_vote_list_line[5]) if parsed_vote_list_line[5].strip() else None,
+        "occupancy": int(parsed_vote_list_line[6]) if parsed_vote_list_line[6].strip() else None,
+        "means": int(parsed_vote_list_line[7]) if parsed_vote_list_line[7].strip() else None,
         # parsed_vote_list_line[8] is partial member name
         "member_name": parsed_vote_list_line[8].strip(),
         "votes": [int(icpsr_vote_code) for icpsr_vote_code in parsed_vote_list_line[9]],
@@ -375,19 +347,13 @@ def parse_vote_list_file(vote_list_file):
         if not vote_list_line.strip():
             continue
 
-        vote_info = extract_vote_info_from_parsed_vote_list_line(
-            parse_vote_list_line(vote_list_line)
-        )
+        vote_info = extract_vote_info_from_parsed_vote_list_line(parse_vote_list_line(vote_list_line))
 
         vote_info["state"] = (
-            get_state_from_icpsr_state_code(vote_info["icpsr_state"])
-            if vote_info["icpsr_state"] is not None
-            else None
+            get_state_from_icpsr_state_code(vote_info["icpsr_state"]) if vote_info["icpsr_state"] is not None else None
         )
         vote_info["party"] = (
-            get_party_from_icpsr_party_code(vote_info["icpsr_party"])
-            if vote_info["icpsr_party"] is not None
-            else None
+            get_party_from_icpsr_party_code(vote_info["icpsr_party"]) if vote_info["icpsr_party"] is not None else None
         )
 
         icpsr_id = vote_info["icpsr_id"]
@@ -442,10 +408,7 @@ def parse_vote_list_file(vote_list_file):
             # skip some guys named Poe (99999) and Chambers (10509) that don't seem to have existed and
             # didn't cast actual votes, and Jack Swigert (15067) who died before being sworn in.
             # and presidents may not have bioguide IDs
-            if (
-                icpsr_id not in (99999, 10509, 15067)
-                and vote_info["state_name"] != "USA"
-            ):
+            if icpsr_id not in (99999, 10509, 15067) and vote_info["state_name"] != "USA":
                 logging.error(
                     "Problem with member %s ([%d] %s) of %s %s: %s"
                     % (
@@ -488,31 +451,21 @@ def parse_rollcall_dtl_list_file(rollcall_dtl_list_file, congress):
         if not rollcall_dtl_list_line.strip():
             continue
 
-        rollcall_dtl_list_line_info = (
-            extract_rollcall_info_from_parsed_rollcall_dtl_list_line(
-                parse_rollcall_dtl_list_line(rollcall_dtl_list_line)
-            )
+        rollcall_dtl_list_line_info = extract_rollcall_info_from_parsed_rollcall_dtl_list_line(
+            parse_rollcall_dtl_list_line(rollcall_dtl_list_line)
         )
 
         if rollcall_dtl_list_line_info["line"] == 1:
             rollcall_info = {}
 
-            rollcall_dtl_list_first_line_parts = parse_rollcall_dtl_list_first_line(
-                rollcall_dtl_list_line_info["text"]
-            )
+            rollcall_dtl_list_first_line_parts = parse_rollcall_dtl_list_first_line(rollcall_dtl_list_line_info["text"])
             rollcall_info["record_id"] = rollcall_dtl_list_first_line_parts[0].strip()
             rollcall_info["journal_id"] = rollcall_dtl_list_first_line_parts[1].strip()
 
-            rollcall_info["date_unparsed"] = rollcall_dtl_list_first_line_parts[
-                3
-            ].strip()
-            rollcall_info["date"] = parse_rollcall_dtl_date(
-                rollcall_info["date_unparsed"]
-            )
+            rollcall_info["date_unparsed"] = rollcall_dtl_list_first_line_parts[3].strip()
+            rollcall_info["date"] = parse_rollcall_dtl_date(rollcall_info["date_unparsed"])
 
-            rollcall_info["bill_unparsed"] = rollcall_dtl_list_first_line_parts[
-                2
-            ].strip()
+            rollcall_info["bill_unparsed"] = rollcall_dtl_list_first_line_parts[2].strip()
             m = re.match(r"([A-Z]+)([0-9]+)$", rollcall_info["bill_unparsed"])
             if m:
                 bill_type_map = {
@@ -545,9 +498,7 @@ def parse_rollcall_dtl_list_file(rollcall_dtl_list_file, congress):
                     'SRES': 'sres',
                 }
                 if not m.group(1) in bill_type_map:
-                    logging.error(
-                        'Could not parse bill: %s' % rollcall_info["bill_unparsed"]
-                    )
+                    logging.error('Could not parse bill: %s' % rollcall_info["bill_unparsed"])
                 else:
                     rollcall_info["bill"] = {
                         'congress': congress,
@@ -674,17 +625,13 @@ def build_votes_dict(votes_list, rollcall):
                 try:
                     v["vote"] = vote_codes[v["vote"]]
                 except KeyError:
-                    logging.error(
-                        'Vote "%s" had a "%d" vote.' % (original_description, v["vote"])
-                    )
+                    logging.error('Vote "%s" had a "%d" vote.' % (original_description, v["vote"]))
                     v["vote"] = "Unknown"
 
     else:
         # This is a regular vote. Use the regular voteview codebook.
         for v in votes_list:
-            v["vote"], v["voteview_votecode_extra"] = parse_voteview_vote_code(
-                v["vote"]
-            )
+            v["vote"], v["voteview_votecode_extra"] = parse_voteview_vote_code(v["vote"])
 
     # Now make a dict from vote option to the legislators who voted
     # that option. Preserve ordering of votes_list which is already
@@ -692,8 +639,7 @@ def build_votes_dict(votes_list, rollcall):
     ret = {
         choice: [v for v in votes_list if v["vote"] == choice]
         for choice in set(v["vote"] for v in votes_list)
-        if choice
-        is not None  # legislators who were not serving at the time of the vote
+        if choice is not None  # legislators who were not serving at the time of the vote
     }
 
     # No longer need the "vote" keys.
@@ -706,15 +652,11 @@ def build_votes_dict(votes_list, rollcall):
 def get_votes(chamber, congress, options, session_dates):
     logging.warn("Getting votes for %d-%s..." % (congress, chamber))
 
-    vote_list_url, rollcall_list_url = vote_list_source_urls_for(
-        congress, chamber, options
-    )
+    vote_list_url, rollcall_list_url = vote_list_source_urls_for(congress, chamber, options)
 
     # Load the ORD file which contains the matrix of how people voted.
 
-    vote_list_file = utils.download(
-        vote_list_url, cache_file_for(congress, chamber, "ord"), options
-    ).encode("utf-8")
+    vote_list_file = utils.download(vote_list_url, cache_file_for(congress, chamber, "ord"), options).encode("utf-8")
     if not vote_list_file:
         logging.error("Couldn't download vote list file.")
         return None
@@ -724,9 +666,9 @@ def get_votes(chamber, congress, options, session_dates):
 
     # Load the DTL file which lists each roll call vote with textual metadata.
 
-    rollcall_list_file = utils.download(
-        rollcall_list_url, cache_file_for(congress, chamber, "dtl"), options
-    ).encode("utf-8")
+    rollcall_list_file = utils.download(rollcall_list_url, cache_file_for(congress, chamber, "dtl"), options).encode(
+        "utf-8"
+    )
     if not rollcall_list_file:
         logging.error("Couldn't download rollcall list file.")
         return None
@@ -756,10 +698,7 @@ def get_votes(chamber, congress, options, session_dates):
         # If the vote is surrounded by votes on the same day, set the date to that day.
         if rollcall_list[i - 1]["date"] == rollcall_list[i + 1]["date"]:
             rollcall_list[i]["date"] = rollcall_list[i - 1]["date"]
-            logging.error(
-                "Replacing %s with %s."
-                % (rollcall_list[i]["date_unparsed"], rollcall_list[i - 1]["date"])
-            )
+            logging.error("Replacing %s with %s." % (rollcall_list[i]["date_unparsed"], rollcall_list[i - 1]["date"]))
 
         # Lump the vote with the previous date.
         else:
@@ -792,15 +731,11 @@ def get_votes(chamber, congress, options, session_dates):
         s_congress, session = session_from_date(rollcall["date"], session_dates)
         if s_congress != congress:
             # should not occur - handled above
-            logging.error(
-                "Vote on %s disagrees about which Congress it is in." % rollcall["date"]
-            )
+            logging.error("Vote on %s disagrees about which Congress it is in." % rollcall["date"])
             continue
         if session is None:
             # This vote did not occur durring a session of Congress. Some sort of data error.
-            logging.error(
-                "Vote on %s is not within a session of Congress." % rollcall["date"]
-            )
+            logging.error("Vote on %s is not within a session of Congress." % rollcall["date"])
             continue
 
         # Only process votes from the requested session.
@@ -827,16 +762,13 @@ def get_votes(chamber, congress, options, session_dates):
             "question": rollcall["description"]
             if "description" in rollcall
             else None,  # Sometimes there isn't a description.
-            "type": normalize_vote_type(rollcall["description"])
-            if "description" in rollcall
-            else None,
+            "type": normalize_vote_type(rollcall["description"]) if "description" in rollcall else None,
             "date": datetime.date(
                 *[int(dd) for dd in rollcall["date"].split("-")]
             ),  # turn YYYY-MM-DD into datetime.date() instance
             "date_unparsed": rollcall["date_unparsed"],
             "votes": votes_dict,
-            "presidents_position": presidents_positions.get(rollcall_number)
-            or rollcall.get('presidents_position'),
+            "presidents_position": presidents_positions.get(rollcall_number) or rollcall.get('presidents_position'),
             "bill": rollcall.get('bill'),
             "category": "unknown",
             "requires": "unknown",

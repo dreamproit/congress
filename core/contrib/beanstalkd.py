@@ -59,9 +59,7 @@ def init_guard(reconnect=False):
             assert 'amendments' in config['beanstalk']['tubes']
             assert 'votes' in config['beanstalk']['tubes']
             tube_names = list(config['beanstalk']['tubes'].values())
-            assert (
-                max(Counter(tube_names).values()) == 1
-            ), 'Must use unique beanstalk tube names.'
+            assert max(Counter(tube_names).values()) == 1, 'Must use unique beanstalk tube names.'
             _Config = config['beanstalk']
     if _Connection is None or reconnect is True:
         conn = beanstalkc.Connection(**_Config['connection'])
@@ -87,9 +85,7 @@ def process_bill_wrapper(process_bill):
                 (conn, config) = init_guard(reconnect=True)
             except Exception as e:
                 logging.warn(
-                    "Ignored exception while queueing bill to beanstalkd: {0} {1}".format(
-                        str(type(e)), str(e)
-                    )
+                    "Ignored exception while queueing bill to beanstalkd: {0} {1}".format(str(type(e)), str(e))
                 )
                 traceback.print_exc()
                 break
@@ -103,9 +99,7 @@ def process_amendment_wrapper(process_amendment):
     @wraps(process_amendment)
     def _process_amendment(amdt_dict, bill_id, options, *args, **kwargs):
         orig_result = process_amendment(amdt_dict, bill_id, options, *args, **kwargs)
-        amdt = amendment_info.build_amendment_id(
-            amdt_dict['type'].lower(), amdt_dict['number'], amdt_dict['congress']
-        )
+        amdt = amendment_info.build_amendment_id(amdt_dict['type'].lower(), amdt_dict['number'], amdt_dict['congress'])
 
         (conn, config) = init_guard()
         for _ in range(2):
@@ -119,9 +113,7 @@ def process_amendment_wrapper(process_amendment):
                 (conn, config) = init_guard(reconnect=True)
             except Exception as e:
                 logging.warn(
-                    "Ignored exception while queueing amendment to beanstalkd: {0} {1}".format(
-                        str(type(e)), str(e)
-                    )
+                    "Ignored exception while queueing amendment to beanstalkd: {0} {1}".format(str(type(e)), str(e))
                 )
                 traceback.print_exc()
                 break
@@ -148,9 +140,7 @@ def output_vote_wrapper(output_vote):
                 (conn, config) = init_guard(reconnect=True)
             except Exception as e:
                 logging.warn(
-                    'Ignored exception while queueing vote to beanstalkd: {0} {1}'.format(
-                        str(type(e)), str(e)
-                    )
+                    'Ignored exception while queueing vote to beanstalkd: {0} {1}'.format(str(type(e)), str(e))
                 )
                 traceback.print_exc()
                 break
@@ -162,9 +152,7 @@ def output_vote_wrapper(output_vote):
 
 def patch(task_name):
     bills.process_bill = process_bill_wrapper(bills.process_bill)
-    amendment_info.process_amendment = process_amendment_wrapper(
-        amendment_info.process_amendment
-    )
+    amendment_info.process_amendment = process_amendment_wrapper(amendment_info.process_amendment)
     vote_info.output_vote = output_vote_wrapper(vote_info.output_vote)
 
 

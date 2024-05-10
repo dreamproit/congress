@@ -346,9 +346,7 @@ class BillActions(unittest.TestCase):
         bill_id = "hr6331-110"
         title = "Medicare Improvements for Patients and Providers Act of 2008"
         state = "VETOED:OVERRIDE_PASS_OVER:HOUSE"
-        line = (
-            "Passed Senate over veto by Yea-Nay Vote. 70 - 26. Record Vote Number: 177."
-        )
+        line = "Passed Senate over veto by Yea-Nay Vote. 70 - 26. Record Vote Number: 177."
 
         new_action, new_state = parse_bill_action(line, state, bill_id, title)
         self.assertEqual(new_action['type'], "vote")
